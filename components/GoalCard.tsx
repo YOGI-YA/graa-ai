@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { Target, ChevronDown, ChevronUp, CheckCircle, Circle, Clock, BookOpen, Trash2, ExternalLink, Route } from 'lucide-react'
 import type { Goal, Milestone } from '@/types/goal'
+import { notify, confirmDialog } from '@/components/Toast'
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-indigo-500/20 text-indigo-300',
@@ -70,16 +71,24 @@ function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
   }, [goal.id, onMilestoneUpdated])
 
   const deleteGoal = useCallback(async () => {
-    if (!confirm('Delete this goal and all its milestones?')) return
+    const ok = await confirmDialog({
+      title: 'Delete this goal?',
+      message: `“${goal.title}” and all its days, lessons, and progress will be permanently removed.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
 
     try {
       const res = await fetch(`/api/goals/${goal.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete goal')
       onDeleted(goal.id)
+      notify('Goal deleted', 'success')
     } catch (error) {
       console.error(error)
+      notify('Could not delete the goal. Please try again.', 'error')
     }
-  }, [goal.id, onDeleted])
+  }, [goal.id, goal.title, onDeleted])
 
   return (
     <div className="glass card-glow rounded-2xl overflow-hidden">

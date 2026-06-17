@@ -64,6 +64,10 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
   const nextTask = useMemo(() => tasks.find(t => !t.completed) ?? null, [tasks])
   const doneCount = useMemo(() => tasks.filter(t => t.completed).length, [tasks])
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
+  // A day unlocks only when every earlier day is complete.
+  const firstIncompleteDay = useMemo(() => (
+    tasks.find(t => !t.completed)?.day ?? (tasks.length ? tasks[tasks.length - 1].day : 1)
+  ), [tasks])
 
   const updateMilestone = useCallback(async (milestone: Milestone, status: string) => {
     setLoadingMilestone(milestone.id)
@@ -201,24 +205,44 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                 <span className="text-xs text-white/35">{tasks.filter(t => t.completed).length}/{tasks.length} done</span>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {tasks.map(task => (
-                  <Link
-                    key={task.id}
-                    href={`/goals/${goal.id}/day/${task.day}`}
-                    className="group flex items-start gap-3 rounded-xl border border-white/8 hover:border-cyan-300/40 hover:bg-cyan-300/[0.05] transition-all p-3"
-                  >
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
-                      task.completed ? 'bg-emerald-400 text-emerald-950' : 'bg-cyan-300/15 text-cyan-200'
-                    }`}>
-                      {task.completed ? <CheckCircle2 size={16} /> : task.day}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-white/35">Day {task.day}{task.type ? ` · ${task.type}` : ''}</div>
-                      <div className="text-sm font-medium truncate group-hover:text-cyan-100 transition-colors">{task.title}</div>
-                    </div>
-                    <Play size={15} className="ml-auto text-white/25 group-hover:text-cyan-300 transition-colors flex-shrink-0 mt-1" />
-                  </Link>
-                ))}
+                {tasks.map(task => {
+                  const locked = task.day > firstIncompleteDay
+                  if (locked) {
+                    return (
+                      <div
+                        key={task.id}
+                        title="Complete the previous day to unlock"
+                        className="flex items-start gap-3 rounded-xl border border-white/8 p-3 opacity-50 cursor-not-allowed"
+                      >
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/5 text-white/30">
+                          <Lock size={14} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[11px] text-white/30">Day {task.day}{task.type ? ` · ${task.type}` : ''}</div>
+                          <div className="text-sm font-medium truncate text-white/45">{task.title}</div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <Link
+                      key={task.id}
+                      href={`/goals/${goal.id}/day/${task.day}`}
+                      className="group flex items-start gap-3 rounded-xl border border-white/8 hover:border-orange-300/40 hover:bg-orange-300/[0.05] transition-all p-3"
+                    >
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
+                        task.completed ? 'bg-emerald-400 text-emerald-950' : 'bg-orange-400/15 text-orange-200'
+                      }`}>
+                        {task.completed ? <CheckCircle2 size={16} /> : task.day}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] text-white/35">Day {task.day}{task.type ? ` · ${task.type}` : ''}</div>
+                        <div className="text-sm font-medium truncate group-hover:text-orange-100 transition-colors">{task.title}</div>
+                      </div>
+                      <Play size={15} className="ml-auto text-white/25 group-hover:text-orange-300 transition-colors flex-shrink-0 mt-1" />
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           )}

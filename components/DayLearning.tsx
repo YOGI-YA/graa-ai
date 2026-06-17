@@ -2,11 +2,12 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, Circle,
-  PlayCircle, BookOpen, Lightbulb, ListChecks, Loader2, ExternalLink, Sparkles,
+  ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, Circle, Lock,
+  PlayCircle, BookOpen, Lightbulb, ListChecks, Loader2, ExternalLink, Sparkles, RefreshCw,
 } from 'lucide-react'
 import QuizPanel from '@/components/QuizPanel'
 import PracticeSandbox from '@/components/PracticeSandbox'
+import { notify } from '@/components/Toast'
 
 interface TaskInfo {
   day: number
@@ -102,6 +103,25 @@ export default function DayLearning({
     fetch(`/api/goals/${goalId}/day/${day + 1}`).catch(() => {})
   }, [loading, error, day, totalDays, goalId])
 
+  // Force-regenerate this day's content (fixes any stale/off-topic cached lesson).
+  const regenerate = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    setContent(null)
+    try {
+      const res = await fetch(`/api/goals/${goalId}/day/${day}?refresh=1`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to regenerate')
+      setContent(data.content)
+      notify('Day content regenerated', 'success')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to regenerate')
+      notify('Could not regenerate this day', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [goalId, day])
+
   const setComplete = useCallback(async (value: boolean) => {
     setToggling(true)
     setCompleted(value)
@@ -140,7 +160,17 @@ export default function DayLearning({
             <ArrowLeft size={16} />
             Roadmap
           </Link>
-          <div className="text-xs text-white/35 truncate max-w-[50%]">{goalTitle}</div>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-xs text-white/35 truncate hidden sm:block">{goalTitle}</span>
+            <button
+              onClick={regenerate}
+              disabled={loading}
+              title="Regenerate this day's content"
+              className="text-white/40 hover:text-orange-300 transition-colors flex items-center gap-1.5 text-xs flex-shrink-0 disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Regenerate
+            </button>
+          </div>
         </div>
 
         {/* Course position */}
@@ -271,7 +301,7 @@ export default function DayLearning({
 
             {/* Practice — unlocks after passing the quiz */}
             {practiceUnlocked ? (
-              <PracticeSandbox goalId={goalId} day={day} />
+              <PracticeSandbox goalId={goalId} day={day} onSolved={() => setCompleted(true)} />
             ) : (
               <section className="glass rounded-2xl p-5 sm:p-6 opacity-60">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-2">
@@ -304,9 +334,18 @@ export default function DayLearning({
                   </Link>
                 )}
                 {nextDay && (
-                  <Link href={`/goals/${goalId}/day/${nextDay}`} className="btn-primary px-4 py-2.5 text-sm flex items-center gap-1">
-                    Day {nextDay} <ChevronRight size={16} />
-                  </Link>
+                  completed ? (
+                    <Link href={`/goals/${goalId}/day/${nextDay}`} className="btn-primary px-4 py-2.5 text-sm flex items-center gap-1">
+                      Day {nextDay} <ChevronRight size={16} />
+                    </Link>
+                  ) : (
+                    <span
+                      title="Complete this day to unlock the next"
+                      className="px-4 py-2.5 text-sm rounded-full bg-white/5 border border-white/10 text-white/35 flex items-center gap-1.5 cursor-not-allowed"
+                    >
+                      <Lock size={14} /> Day {nextDay}
+                    </span>
+                  )
                 )}
               </div>
             </div>

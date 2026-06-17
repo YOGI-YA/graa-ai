@@ -120,7 +120,7 @@ export default function ProfilePage() {
                       onClick={() => setLearningStyle(v => (v === s.value ? '' : s.value))}
                       className={`p-3 rounded-xl text-left border transition-all text-xs ${
                         learningStyle === s.value
-                          ? 'bg-cyan-400/15 border-cyan-300/50 text-white shadow-[0_0_0_3px_rgba(34,211,238,0.10)]'
+                          ? 'bg-orange-400/15 border-orange-300/50 text-white shadow-[0_0_0_3px_rgba(255,106,0,0.12)]'
                           : 'bg-white/5 border-white/10 text-white/60 hover:border-white/25'
                       }`}
                     >

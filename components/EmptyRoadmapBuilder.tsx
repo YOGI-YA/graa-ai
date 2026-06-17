@@ -118,9 +118,63 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
     }
   }, [generateRoadmap])
 
+  const composer = (
+    <div className="w-full">
+      {error && <p className="text-rose-300 text-xs mb-2">{error}</p>}
+      <div className="glass rounded-2xl p-2 shadow-xl shadow-black/30">
+        <textarea
+          value={prompt}
+          onChange={event => setPrompt(event.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          placeholder={promptPlaceholder}
+          className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1.5 text-sm text-white placeholder-white/35 focus:outline-none min-h-[48px] max-h-40"
+        />
+        <div className="flex items-center justify-between gap-2 pl-1.5 pr-1 pb-0.5">
+          <div className="flex items-center gap-1.5">
+            {!roadmap && (
+              <>
+                <div className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] transition-colors px-2.5 py-1.5">
+                  <CalendarDays size={13} className="text-white/40" />
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={days}
+                    onChange={e => setDays(e.target.value)}
+                    placeholder="Days"
+                    className="w-12 bg-transparent text-xs text-white placeholder-white/35 focus:outline-none"
+                  />
+                </div>
+                <select
+                  value={skillLevel}
+                  onChange={e => setSkillLevel(e.target.value)}
+                  className="rounded-lg bg-white/[0.04] hover:bg-white/[0.07] transition-colors px-2.5 py-1.5 text-xs text-white/60 focus:outline-none cursor-pointer"
+                >
+                  <option value="">Skill level</option>
+                  {SKILL_LEVELS.map(level => (
+                    <option key={level} value={level} className="bg-[#15151a] capitalize">{level}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+          <button
+            onClick={generateRoadmap}
+            disabled={loading || saving || !prompt.trim()}
+            className="w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40 disabled:hover:bg-orange-500 transition-colors flex items-center justify-center flex-shrink-0"
+            aria-label={roadmap ? 'Update roadmap' : 'Generate roadmap'}
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={17} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <section className="min-h-[calc(100vh-73px)] pb-40">
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-10 sm:pt-14">
+    <section className="min-h-[calc(100vh-90px)]">
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10">
         {roadmap ? (
           <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -206,7 +260,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
               <div className="glass rounded-xl p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-3">
                   <Sparkles size={16} className="text-cyan-300" />
-                  Mentor Note
+                  Graa&apos;s note
                 </div>
                 <p className="text-white/58 text-sm leading-relaxed">{roadmap.advice}</p>
               </div>
@@ -225,69 +279,25 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
                 </div>
               </div>
             </div>
+
+            {/* Adjust composer */}
+            <div className="pt-2">
+              <p className="eyebrow text-white/35 mb-2">Want changes? Just ask</p>
+              {composer}
+            </div>
           </div>
         ) : (
-          <div className="min-h-[calc(100vh-260px)] flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-400/15 flex items-center justify-center mb-6">
-              <Sparkles size={22} className="text-indigo-200" />
-            </div>
-            <h1 className="text-3xl sm:text-5xl font-semibold tracking-normal">What should we build toward?</h1>
-            <p className="text-white/48 mt-4 max-w-xl text-sm sm:text-base leading-relaxed">
-              Describe the outcome you want, your current level, and any deadline. The AI will shape it into a day-by-day roadmap before anything is saved.
+          <div className="min-h-[calc(100vh-180px)] flex flex-col items-center justify-center text-center">
+            <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight text-balance">What should we build toward?</h1>
+            <p className="text-white/50 mt-5 max-w-xl text-sm sm:text-base leading-relaxed">
+              Describe the outcome you want, your current level, and any deadline — Graa shapes it into a day-by-day roadmap before anything is saved.
             </p>
+            <div className="w-full max-w-2xl mt-9">
+              {composer}
+              <p className="text-[11px] text-white/30 mt-3">Leave days empty and Graa picks a sensible length.</p>
+            </div>
           </div>
         )}
-      </div>
-
-      <div className="fixed left-0 right-0 bottom-0 z-30 bg-[#0a0c18] border-t border-white/8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-8 py-4">
-          {error && <p className="text-red-300 text-xs mb-2">{error}</p>}
-          {!roadmap && (
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <label className="flex items-center gap-1.5 text-xs text-white/45">
-                <CalendarDays size={13} className="text-cyan-300/70" />
-                <input
-                  type="number"
-                  min={1}
-                  max={90}
-                  value={days}
-                  onChange={e => setDays(e.target.value)}
-                  placeholder="Days (auto)"
-                  className="w-24 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50"
-                />
-              </label>
-              <select
-                value={skillLevel}
-                onChange={e => setSkillLevel(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 focus:outline-none focus:border-cyan-400/50"
-              >
-                <option value="">Skill level</option>
-                {SKILL_LEVELS.map(level => (
-                  <option key={level} value={level} className="bg-gray-900 capitalize">{level}</option>
-                ))}
-              </select>
-              <span className="text-[11px] text-white/30">Leave days empty and the AI picks a sensible length.</span>
-            </div>
-          )}
-          <div className="glass rounded-2xl p-2 flex items-end gap-2">
-            <textarea
-              value={prompt}
-              onChange={event => setPrompt(event.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              placeholder={promptPlaceholder}
-              className="min-h-12 max-h-32 flex-1 resize-none bg-transparent px-3 py-3 text-sm text-white placeholder-white/32 focus:outline-none"
-            />
-            <button
-              onClick={generateRoadmap}
-              disabled={loading || saving || !prompt.trim()}
-              className="w-10 h-10 rounded-xl bg-white text-black hover:bg-cyan-100 disabled:opacity-40 disabled:hover:bg-white transition-colors flex items-center justify-center flex-shrink-0"
-              aria-label={roadmap ? 'Update roadmap' : 'Generate roadmap'}
-            >
-              {loading ? <Loader2 size={17} className="animate-spin" /> : <ArrowUp size={18} />}
-            </button>
-          </div>
-        </div>
       </div>
     </section>
   )

@@ -67,7 +67,7 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
             </div>
             <h3 className="font-semibold mb-3">Goal Created!</h3>
             <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 text-sm text-indigo-200 leading-relaxed text-left mb-3">
-              <p className="text-xs text-indigo-400 font-medium mb-1.5">AI Mentor says:</p>
+              <p className="text-xs text-indigo-400 font-medium mb-1.5">Graa says:</p>
               {advice}
             </div>
             <p className="text-white/40 text-xs">Redirecting to your dashboard...</p>

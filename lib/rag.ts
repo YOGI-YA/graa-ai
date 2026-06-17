@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { prisma } from './prisma'
-import { embed, embedBatch, toVectorLiteral, EMBEDDING_DIM } from './embeddings'
+import { embed, embedBatch, toVectorLiteral, EMBEDDING_DIM, embeddingsEnabled } from './embeddings'
 
 // Lightweight RAG over pgvector inside the existing Neon Postgres.
 // content_chunks is managed with raw SQL (Prisma 5.7 lacks first-class vector support).
@@ -63,6 +63,7 @@ export interface IndexableDay {
 
 /** Chunk + embed a day's content and (re)store it in the vector table. */
 export async function indexDayContent(goalId: string, day: number, data: IndexableDay): Promise<number> {
+  if (!embeddingsEnabled) return 0
   await ensureStore()
 
   const raw: { source: string; text: string }[] = []
@@ -107,6 +108,7 @@ export interface RetrievedChunk {
 
 /** Retrieve the most relevant chunks for a query within a goal. */
 export async function retrieve(goalId: string, query: string, k = 5): Promise<RetrievedChunk[]> {
+  if (!embeddingsEnabled) return []
   try {
     await ensureStore()
     const vec = toVectorLiteral(await embed(query))

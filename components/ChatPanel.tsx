@@ -6,7 +6,7 @@ import type { Goal } from '@/types/goal'
 interface Message { role: 'user' | 'assistant'; content: string }
 
 const INITIAL_MESSAGES: Message[] = [
-  { role: 'assistant', content: "Hi! I'm your AI Goal Mentor. I can help you strategize, break down challenges, or answer questions about your learning journey. What's on your mind?" },
+  { role: 'assistant', content: "Hi! I'm Graa, your AI mentor. I can help you strategize, break down challenges, or answer questions about your learning journey. What's on your mind?" },
 ]
 
 const Bubble = memo(function Bubble({
@@ -148,7 +148,7 @@ function ChatPanel({ goals, onClose }: { goals: Goal[]; onClose: () => void }) {
               <Brain size={15} className="text-indigo-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold">AI Mentor</p>
+              <p className="text-sm font-semibold">Graa</p>
               <p className="text-xs text-white/40">Powered by Groq · LLaMA 3.3</p>
             </div>
           </div>

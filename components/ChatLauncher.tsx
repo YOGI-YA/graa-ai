@@ -81,13 +81,13 @@ export default function ChatLauncher() {
           onPointerUp={onPointerUp}
           style={{ left: pos.x, top: pos.y }}
           className="group fixed z-50 w-14 h-14 rounded-2xl touch-none cursor-grab active:cursor-grabbing scale-in
-                     bg-gradient-to-br from-indigo-500 via-violet-500 to-cyan-400 text-white
-                     shadow-xl shadow-violet-500/40 flex items-center justify-center
+                     bg-gradient-to-br from-amber-400 to-orange-600 text-[#120a02]
+                     shadow-xl shadow-orange-500/40 flex items-center justify-center
                      hover:scale-110 active:scale-95 transition-transform will-change-transform"
           aria-label="Open AI mentor"
         >
-          <span className="absolute inset-0 rounded-2xl ring-2 ring-white/30 animate-ping opacity-30 group-hover:opacity-0" />
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0b0d1c]" />
+          <span className="absolute inset-0 rounded-2xl ring-2 ring-orange-300/40 animate-ping opacity-30 group-hover:opacity-0" />
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0a0a0c]" />
           <Bot size={24} className="relative" />
         </button>
       )}

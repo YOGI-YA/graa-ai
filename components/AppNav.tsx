@@ -47,8 +47,8 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
                 href={href}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
                   active
-                    ? 'bg-gradient-to-br from-indigo-500/30 to-violet-500/20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
-                    : 'text-white/55 hover:text-white hover:bg-white/6'
+                    ? 'bg-orange-500/15 text-orange-200 border border-orange-400/20'
+                    : 'text-white/55 hover:text-white hover:bg-white/6 border border-transparent'
                 }`}
               >
                 <Icon size={14} />
@@ -72,7 +72,7 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
               onClick={() => setMenuOpen(o => !o)}
               aria-label="Account menu"
               aria-expanded={menuOpen}
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-xs font-semibold text-white shadow-lg shadow-violet-500/30 hover:scale-105 transition-transform"
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-xs font-bold text-[#120a02] shadow-lg shadow-orange-500/30 hover:scale-105 transition-transform"
             >
               {initial || <User size={14} />}
             </button>

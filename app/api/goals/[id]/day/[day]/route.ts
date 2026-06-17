@@ -34,16 +34,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!owned) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const { goal, task } = owned
 
-    const cached = await prisma.dayContent.findUnique({ where: { goalId_day: { goalId: id, day } } })
-    if (cached) {
-      return NextResponse.json({ task, content: { video: cached.video, docs: cached.docs, text: cached.text }, cached: true })
+    const refresh = req.nextUrl.searchParams.get('refresh') === '1'
+
+    if (!refresh) {
+      const cached = await prisma.dayContent.findUnique({ where: { goalId_day: { goalId: id, day } } })
+      if (cached) {
+        return NextResponse.json({ task, content: { video: cached.video, docs: cached.docs, text: cached.text }, cached: true })
+      }
     }
 
     const topic = task?.title || `${goal.title} — day ${day}`
     const description = task?.description || ''
-    const context = `${goal.title} (${goal.category})`
 
-    const sources = await gatherSources(topic, context)
+    // Search the SPECIFIC day topic; pass the category only as a light disambiguator.
+    const sources = await gatherSources(topic, goal.category)
     const lesson = await generateDayLesson(topic, description, sources.snippets)
 
     const content = {
@@ -61,8 +65,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     await prisma.dayContent.upsert({
       where: { goalId_day: { goalId: id, day } },
       create: { goalId: id, day, video: videoJson, docs: docsJson, text: textJson },
-      update: { video: videoJson, docs: docsJson, text: textJson },
+      // On refresh, also clear the derived practice task so it regenerates fresh.
+      update: { video: videoJson, docs: docsJson, text: textJson, ...(refresh ? { practice: Prisma.JsonNull } : {}) },
     })
+
+    // On refresh, drop the cached quiz so it regenerates from the corrected content.
+    if (refresh) {
+      await prisma.quiz.deleteMany({ where: { goalId: id, day } }).catch(() => {})
+    }
 
     // Index this day's content for RAG (best-effort — never block the response).
     try {

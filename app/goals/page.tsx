@@ -52,8 +52,8 @@ export default function GoalsPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
         <div className="flex items-end justify-between gap-4 mb-8 fade-up">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Your goals</h1>
-            <p className="text-white/50 text-sm mt-1.5">Pick a goal to open its roadmap and daily lessons.</p>
+            <h1 className="display text-3xl sm:text-4xl">Your goals</h1>
+            <p className="text-white/50 text-sm mt-2">Pick a goal to open its roadmap and daily lessons.</p>
           </div>
           <Link href="/dashboard" className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
             <Plus size={16} /> New goal

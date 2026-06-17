@@ -346,6 +346,8 @@ Focus: ${description}
 
 ${grounding}
 
+CRITICAL: Teach ONLY "${topic}". Stay strictly on this specific subtopic — do NOT teach the broader goal or unrelated technologies. If any source excerpt is off-topic, ignore it entirely.
+
 Respond ONLY with a valid JSON object in this exact format:
 {
   "summary": "2-3 sentence overview of what the learner will understand by end of day",
@@ -356,7 +358,7 @@ Respond ONLY with a valid JSON object in this exact format:
   "practiceHint": "1-2 sentences suggesting how to practice this today"
 }
 
-Write 3-5 sections. Be concrete and practical. Plain text in bodies (no markdown headers).`
+Write 3-5 sections, all about "${topic}". Be concrete and practical. Plain text in bodies (no markdown headers).`
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
@@ -432,11 +434,12 @@ Rules: exactly 4 options per question; answerIndex is the 0-based index of the c
 
 export interface PracticeTask {
   title: string
-  language: string // javascript | typescript | html | css | python | sql | none | ...
+  language: string // javascript | typescript | python | java | cpp | go | ... | none
   instructions: string
   steps: string[]
   starterCode: string
   checklist: string[]
+  hints: string[]
 }
 
 /** Generate a hands-on practice task for a day, grounded in the day's material. */
@@ -458,18 +461,19 @@ ${grounding || '(use accurate general knowledge of the topic)'}
 Respond ONLY with a valid JSON object in this exact format:
 {
   "title": "short task title",
-  "language": "the primary language/tech for the task: javascript, typescript, html, css, python, sql, or none if it is not a coding task",
+  "language": "primary language for the task — one of: javascript, typescript, python, java, cpp, c, go, rust, ruby, php, csharp, sql, or none if it isn't a coding task",
   "instructions": "2-4 sentences describing the task and the expected outcome",
   "steps": ["concrete step 1", "step 2", "step 3"],
-  "starterCode": "starter code the learner edits to begin (include helpful comments). Empty string if language is none.",
-  "checklist": ["done when …", "…"]
+  "starterCode": "runnable starter code the learner edits (include a main/entry point and a sample call so Run produces output). Empty string only if language is none.",
+  "checklist": ["done when …", "…"],
+  "hints": ["gentle nudge", "more specific hint", "near-solution hint"]
 }
 
-Make the task small enough to finish in one session and directly tied to today's topic.`
+Make the task small enough to finish in one session, directly tied to today's topic, and runnable as-is (it should print something when run). Provide exactly 3 progressively more revealing hints.`
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 1800,
+    maxTokens: 2000,
   })
 
   const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -483,6 +487,50 @@ Make the task small enough to finish in one session and directly tied to today's
     steps: Array.isArray(p.steps) ? p.steps.filter(Boolean) : [],
     starterCode: typeof p.starterCode === 'string' ? p.starterCode : '',
     checklist: Array.isArray(p.checklist) ? p.checklist.filter(Boolean) : [],
+    hints: Array.isArray(p.hints) ? p.hints.filter(Boolean) : [],
+  }
+}
+
+export interface SubmissionResult {
+  passed: boolean
+  feedback: string
+}
+
+/** Evaluate a learner's code submission against the practice task. */
+export async function evaluateSubmission(
+  task: { title: string; instructions: string; checklist?: string[] },
+  code: string,
+  language: string,
+  runOutput?: string
+): Promise<SubmissionResult> {
+  const prompt = `You are a strict-but-fair coding mentor grading a practice submission.
+
+Task: ${task.title}
+Instructions: ${task.instructions}
+${task.checklist?.length ? `Done when:\n- ${task.checklist.join('\n- ')}` : ''}
+
+Language: ${language}
+Submitted code:
+\`\`\`
+${code.slice(0, 6000)}
+\`\`\`
+${runOutput ? `Program output when run:\n${runOutput.slice(0, 1500)}` : ''}
+
+Decide if the submission genuinely satisfies the task. Respond ONLY with valid JSON:
+{ "passed": true/false, "feedback": "2-3 sentences: what's good, and if failed, exactly what to fix (no full solution)" }`
+
+  const content = await createChatCompletion([{ role: 'user', content: prompt }], {
+    temperature: 0.2,
+    maxTokens: 400,
+  })
+
+  try {
+    const match = content.match(/\{[\s\S]*\}/)
+    if (!match) throw new Error('no json')
+    const parsed = JSON.parse(match[0]) as Partial<SubmissionResult>
+    return { passed: Boolean(parsed.passed), feedback: parsed.feedback || 'Reviewed.' }
+  } catch {
+    return { passed: false, feedback: 'Could not evaluate the submission. Please try again.' }
   }
 }
 
@@ -521,7 +569,7 @@ export async function streamChatWithMentor(
   const apiKey = options.apiKey || process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured')
 
-  const systemPrompt = `You are AI Goal Mentor, a personalized learning assistant that helps users achieve their educational and professional goals. You provide specific, actionable advice, break down complex topics, and keep users motivated.${goalContext ? ` Current context: ${goalContext}` : ''} Be concise, warm, and practical.`
+  const systemPrompt = `You are Graa, the AI mentor inside Graa AI — a personalized learning assistant that helps users achieve their educational and professional goals. You provide specific, actionable advice, break down complex topics, and keep users motivated.${goalContext ? ` Current context: ${goalContext}` : ''} Be concise, warm, and practical.`
 
   const upstream = await fetch(GROQ_URL, {
     method: 'POST',
@@ -587,7 +635,7 @@ export async function chatWithMentor(
   messages: { role: 'user' | 'assistant'; content: string }[],
   goalContext?: string
 ): Promise<string> {
-  const systemPrompt = `You are AI Goal Mentor, a personalized learning assistant that helps users achieve their educational and professional goals. You provide specific, actionable advice, break down complex topics, and keep users motivated.${goalContext ? ` Current context: ${goalContext}` : ''} Be concise, warm, and practical.`
+  const systemPrompt = `You are Graa, the AI mentor inside Graa AI — a personalized learning assistant that helps users achieve their educational and professional goals. You provide specific, actionable advice, break down complex topics, and keep users motivated.${goalContext ? ` Current context: ${goalContext}` : ''} Be concise, warm, and practical.`
 
   const content = await createChatCompletion(
     [

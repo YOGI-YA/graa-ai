@@ -98,19 +98,19 @@ export default function Dashboard() {
       ) : (
         <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
           {/* Greeting */}
-          <div className="mb-7 fade-up">
-            <p className="text-sm text-white/45">{greeting()}{firstName ? ',' : ''}</p>
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mt-0.5">{firstName || 'Welcome back'}</h1>
+          <div className="mb-8 fade-up">
+            <p className="eyebrow text-orange-400">{greeting()}</p>
+            <h1 className="display text-3xl sm:text-4xl mt-1.5">{firstName ? `Hey, ${firstName}` : 'Dashboard'}</h1>
           </div>
 
           {/* Continue learning hero */}
           {resume && (
             <section className="glass-strong rounded-3xl p-6 sm:p-7 mb-8 relative overflow-hidden fade-up" style={{ animationDelay: '60ms' }}>
               <div className="absolute -top-20 -right-10 w-64 h-64 rounded-full pointer-events-none"
-                   style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.18), transparent 70%)' }} />
+                   style={{ background: 'radial-gradient(circle, rgba(255,106,0,0.16), transparent 70%)' }} />
               <div className="relative flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-cyan-200/80 bg-cyan-400/10 border border-cyan-300/15 rounded-full px-2.5 py-1 mb-3">
+                  <div className="inline-flex items-center gap-1.5 eyebrow text-orange-400 mb-3">
                     <Flame size={12} /> {resume.next ? 'Pick up where you left off' : 'Goal complete'}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">{resume.goal.title}</h2>
@@ -151,15 +151,15 @@ export default function Dashboard() {
           )}
 
           {/* Stat strip */}
-          <div className="grid grid-cols-3 gap-4 mb-10 stagger">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-10 stagger">
             {[
-              { label: 'Day streak goals', value: stats.activeGoals, hint: 'active' },
-              { label: 'Lessons completed', value: `${stats.completedLessons}/${stats.totalLessons}`, hint: 'days done' },
-              { label: 'Overall progress', value: `${stats.overall}%`, hint: 'across goals' },
+              { label: 'Active goals', value: stats.activeGoals },
+              { label: 'Lessons done', value: `${stats.completedLessons}/${stats.totalLessons}` },
+              { label: 'Overall', value: `${stats.overall}%` },
             ].map((s, i) => (
               <div key={s.label} className="glass rounded-2xl p-4 sm:p-5" style={{ ['--i' as string]: i }}>
-                <div className="text-2xl sm:text-3xl font-semibold tracking-tight">{s.value}</div>
-                <div className="text-white/45 text-xs mt-1">{s.label}</div>
+                <div className="display text-2xl sm:text-4xl">{s.value}</div>
+                <div className="eyebrow text-white/40 mt-2">{s.label}</div>
               </div>
             ))}
           </div>
@@ -167,8 +167,8 @@ export default function Dashboard() {
           {/* Goals */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Your goals</h2>
-              <p className="text-white/40 text-sm mt-0.5">{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {stats.completedGoals} completed</p>
+              <h2 className="display text-xl sm:text-2xl">Your goals</h2>
+              <p className="text-white/40 text-sm mt-1">{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {stats.completedGoals} completed</p>
             </div>
             <button onClick={openNewGoal} className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
               <Plus size={16} /> New goal

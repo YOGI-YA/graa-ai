@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { generatePracticeTask, type PracticeTask } from '@/lib/groq'
+import { generatePracticeTask, evaluateSubmission, type PracticeTask } from '@/lib/groq'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -67,5 +67,42 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   } catch (error) {
     console.error('Practice GET error', error)
     return NextResponse.json({ error: 'Failed to load practice task' }, { status: 500 })
+  }
+}
+
+// POST — evaluate a code submission; mark the day complete if it passes.
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id, day: dayStr } = await params
+    const day = parseInt(dayStr, 10)
+    const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true } })
+    if (!goal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const { code, language } = await req.json()
+    if (typeof code !== 'string' || !code.trim()) {
+      return NextResponse.json({ error: 'Code is required' }, { status: 400 })
+    }
+
+    const content = await prisma.dayContent.findUnique({ where: { goalId_day: { goalId: id, day } } })
+    const task = content?.practice as unknown as PracticeTask | null
+    if (!task) return NextResponse.json({ error: 'No practice task for this day' }, { status: 404 })
+
+    const result = await evaluateSubmission(
+      { title: task.title, instructions: task.instructions, checklist: task.checklist },
+      code,
+      typeof language === 'string' ? language : task.language,
+    )
+
+    if (result.passed) {
+      await prisma.task.updateMany({ where: { goalId: id, day }, data: { completed: true } })
+    }
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Practice POST error', error)
+    return NextResponse.json({ error: 'Failed to evaluate submission' }, { status: 500 })
   }
 }

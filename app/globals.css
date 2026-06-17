@@ -1,32 +1,55 @@
 @import "tailwindcss";
 
+/* Remap the generic "AI" cool palette (cyan/indigo/violet/purple/pink) onto a
+   warm-neutral (stone) ramp, so the app reads professional & restrained — orange
+   stays reserved for real accents (buttons, progress, logo). Emerald/amber/red/
+   yellow stay (semantic). One-place change; no component edits needed. */
+@theme {
+  --color-cyan-100: var(--color-stone-100);
+  --color-cyan-200: var(--color-stone-200);
+  --color-cyan-300: var(--color-stone-300);
+  --color-cyan-400: var(--color-stone-400);
+  --color-cyan-500: var(--color-stone-500);
+  --color-cyan-950: var(--color-stone-950);
+
+  --color-indigo-200: var(--color-stone-200);
+  --color-indigo-300: var(--color-stone-300);
+  --color-indigo-400: var(--color-stone-400);
+  --color-indigo-500: var(--color-stone-500);
+  --color-indigo-600: var(--color-stone-600);
+
+  --color-violet-500: var(--color-stone-500);
+
+  --color-purple-300: var(--color-stone-300);
+  --color-purple-400: var(--color-stone-400);
+  --color-purple-500: var(--color-stone-500);
+
+  --color-pink-300: var(--color-stone-300);
+  --color-pink-500: var(--color-stone-500);
+}
+
 /* ============================================================
-   Aurora Dark — design system
+   Ember — opinionated dark + fire-orange identity
+   (black canvas, one bold accent, crisp bordered cards,
+    monospace eyebrows, heavy type — no glassmorphism)
    ============================================================ */
 
 :root {
-  --bg: #060713;
-  --bg-soft: #0b0d1c;
-  --surface: 255 255 255;          /* used as rgb(var(--surface) / a) */
+  --bg: #0a0a0c;
+  --panel: 255 255 255;        /* used as rgb(var(--panel)/a) for raised surfaces */
   --border: 255 255 255;
-  --foreground: #e9e9f4;
-  --muted: #a9abc6;
+  --foreground: #ededf1;
+  --muted: #9a9aa6;
 
-  --accent: 34 211 238;            /* cyan */
-  --accent-2: 139 92 246;          /* violet */
-  --accent-3: 99 102 241;          /* indigo */
+  --accent: 255 106 0;         /* #ff6a00 fire orange */
+  --accent-2: 255 176 32;      /* #ffb020 amber */
+  --ring: 255 106 0;
 
-  --radius: 16px;
-  --ring: 34 211 238;
+  --radius: 14px;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-html {
-  scrollbar-gutter: stable;
-}
+* { -webkit-tap-highlight-color: transparent; }
+html { scrollbar-gutter: stable; }
 
 body {
   background: var(--bg);
@@ -34,206 +57,169 @@ body {
   font-family: var(--font-inter, 'Inter'), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.012em;
 }
 
-/* ---- Global scrollbar ---- */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--border) / 0.14) transparent;
-}
+/* ---- Scrollbar ---- */
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--border) / 0.14) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb {
-  background: rgb(var(--border) / 0.14);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
+*::-webkit-scrollbar-thumb { background: rgb(var(--border) / 0.14); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: rgb(var(--border) / 0.26); background-clip: content-box; }
-*::-webkit-scrollbar-track { background: transparent; }
-
 ::selection { background: rgb(var(--accent) / 0.30); color: #fff; }
 
 /* ============================================================
-   Surfaces
+   Surfaces — solid, crisply bordered (no blur)
    ============================================================ */
-
-/* No backdrop-filter — it's applied to dozens of cards and is the main cause of
-   scroll/paint jank. A slightly-opaque base over the dark aurora looks just as
-   good and costs nothing. */
 .glass {
-  background: linear-gradient(180deg, rgba(22, 24, 44, 0.55), rgba(16, 18, 34, 0.45));
-  border: 1px solid rgb(var(--border) / 0.09);
-  box-shadow: inset 0 1px 0 rgb(var(--border) / 0.06);
+  background: rgb(var(--panel) / 0.025);
+  border: 1px solid rgb(var(--border) / 0.08);
 }
-
 .glass-strong {
-  background: linear-gradient(180deg, rgba(24, 26, 48, 0.92), rgba(14, 16, 32, 0.92));
-  border: 1px solid rgb(var(--border) / 0.12);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--border) / 0.10),
-    0 24px 60px -20px rgb(0 0 0 / 0.6);
+  background: #141418;
+  border: 1px solid rgb(var(--border) / 0.10);
+  box-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.7);
 }
 
-/* Gradient hairline border on hover for interactive cards */
 .card-glow {
-  position: relative;
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.28s cubic-bezier(0.22,1,0.36,1), border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .card-glow:hover {
   transform: translateY(-3px);
-  border-color: rgb(var(--accent) / 0.40);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--border) / 0.12),
-    0 18px 50px -22px rgb(var(--accent) / 0.45);
+  border-color: rgb(var(--accent) / 0.45);
+  box-shadow: 0 18px 44px -24px rgb(var(--accent) / 0.45);
 }
-
-.card-hover {
-  transition: transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
-}
-.card-hover:hover {
-  transform: translateY(-3px);
-  border-color: rgb(var(--accent) / 0.35);
-}
+.card-hover { transition: transform 0.22s ease, border-color 0.22s ease; }
+.card-hover:hover { transform: translateY(-3px); border-color: rgb(var(--accent) / 0.4); }
 
 /* ============================================================
-   Text
+   Type
    ============================================================ */
-
-/* Static gradient — animating background-position on many elements caused
-   constant repaints. The gradient still looks premium without motion. */
 .gradient-text {
-  background: linear-gradient(110deg, #67e8f9, #818cf8 45%, #c4b5fd 80%);
+  background: linear-gradient(96deg, #ffb020, #ff6a00 60%, #ff7a1a);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-
 .text-balance { text-wrap: balance; }
+
+/* Chunky uppercase display type — the fireship signature for big headlines */
+.display {
+  font-family: var(--font-display), 'Archivo Black', system-ui, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
+}
+
+/* Monospace eyebrow / kicker labels — the dev-brand signature */
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  font-weight: 500;
+}
+.mono { font-family: var(--font-mono), ui-monospace, monospace; }
 
 /* ============================================================
    Buttons & inputs
    ============================================================ */
-
+/* Pill buttons — amber primary with near-black text (fireship CTA style) */
 .btn-primary {
-  position: relative;
-  background: linear-gradient(135deg, rgb(var(--accent-3)), rgb(var(--accent-2)));
-  color: #fff;
-  border-radius: 14px;
-  font-weight: 600;
-  box-shadow: 0 10px 30px -12px rgb(var(--accent-2) / 0.7);
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, filter 0.2s ease;
+  background: #f6a609;
+  color: #1a1205;
+  border-radius: 9999px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px -12px rgb(246 166 9 / 0.6);
+  transition: transform 0.16s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease, filter 0.18s ease;
 }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -12px rgb(var(--accent-2) / 0.8); filter: brightness(1.07); }
+.btn-primary:hover { transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 18px 38px -12px rgb(246 166 9 / 0.7); }
 .btn-primary:active { transform: translateY(0) scale(0.985); }
-.btn-primary:disabled { opacity: 0.6; transform: none; filter: none; cursor: not-allowed; }
+.btn-primary:disabled { opacity: 0.55; transform: none; filter: none; cursor: not-allowed; }
 
 .btn-ghost {
-  background: rgb(var(--surface) / 0.05);
-  border: 1px solid rgb(var(--border) / 0.12);
-  color: rgb(var(--foreground) / 0.85);
-  border-radius: 14px;
-  font-weight: 500;
-  transition: transform 0.18s ease, border-color 0.25s ease, background-color 0.25s ease;
+  background: rgb(var(--panel) / 0.04);
+  border: 1px solid rgb(var(--border) / 0.16);
+  color: rgb(var(--foreground) / 0.9);
+  border-radius: 9999px;
+  font-weight: 700;
+  transition: transform 0.16s ease, border-color 0.22s ease, background-color 0.22s ease;
 }
-.btn-ghost:hover { transform: translateY(-2px); border-color: rgb(var(--border) / 0.28); background: rgb(var(--surface) / 0.08); }
+.btn-ghost:hover { transform: translateY(-2px); border-color: rgb(var(--accent) / 0.55); background: rgb(var(--panel) / 0.07); }
 .btn-ghost:active { transform: translateY(0) scale(0.985); }
+
+/* Amber-outline pill (fireship "LOGIN" style) */
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid #f6a609;
+  color: #f6a609;
+  border-radius: 9999px;
+  font-weight: 800;
+  transition: transform 0.16s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.btn-outline:hover { transform: translateY(-2px); background: #f6a609; color: #1a1205; }
 
 .field {
   width: 100%;
-  background: rgb(var(--surface) / 0.045);
+  background: rgb(var(--panel) / 0.04);
   border: 1px solid rgb(var(--border) / 0.10);
-  border-radius: 14px;
+  border-radius: 12px;
   color: #fff;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 .field::placeholder { color: rgb(var(--border) / 0.30); }
 .field:focus {
   outline: none;
-  border-color: rgb(var(--accent) / 0.55);
-  box-shadow: 0 0 0 4px rgb(var(--accent) / 0.12);
-  background: rgb(var(--surface) / 0.06);
-}
-
-.focus-ring:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgb(var(--ring) / 0.45);
-  border-radius: 12px;
+  border-color: rgb(var(--accent) / 0.6);
+  box-shadow: 0 0 0 4px rgb(var(--accent) / 0.14);
 }
 
 /* ============================================================
-   Aurora background
+   Background — near-solid black with a single faint warm glow
    ============================================================ */
-
 .aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  /* Soft glows via radial gradients — no blur filter, no extra layers. */
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
   background:
-    radial-gradient(46vw 40vw at 10% -8%, rgb(var(--accent-3) / 0.30), transparent 60%),
-    radial-gradient(42vw 38vw at 94% -2%, rgb(var(--accent-2) / 0.26), transparent 62%),
-    radial-gradient(50vw 44vw at 62% 112%, rgb(var(--accent) / 0.16), transparent 62%),
-    radial-gradient(120% 120% at 50% 0%, #0a0c1d 0%, var(--bg) 55%);
+    radial-gradient(55vw 32vw at 50% -12%, rgb(var(--accent) / 0.10), transparent 60%),
+    var(--bg);
 }
 .aurora__grid {
   position: absolute; inset: 0;
   background-image:
-    linear-gradient(rgb(var(--border) / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--border) / 0.035) 1px, transparent 1px);
-  background-size: 60px 60px;
-  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 28%, transparent 72%);
-  mask-image: radial-gradient(120% 80% at 50% 0%, #000 28%, transparent 72%);
+    linear-gradient(rgb(var(--border) / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--border) / 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(120% 75% at 50% 0%, #000 25%, transparent 70%);
+  mask-image: radial-gradient(120% 75% at 50% 0%, #000 25%, transparent 70%);
 }
 
 /* ============================================================
-   Entrance & micro animations
+   Motion
    ============================================================ */
-
 @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-.fade-up { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.scale-in { animation: scaleIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.msg-in { animation: msgIn 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.fade-up { animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+.scale-in { animation: scaleIn 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+.msg-in { animation: msgIn 0.22s cubic-bezier(0.22,1,0.36,1); }
+.stagger > * { animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both; animation-delay: calc(var(--i, 0) * 65ms); }
 
-/* Stagger helper: set style={{ ['--i']: n }} on children */
-.stagger > * { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
-
-/* Streaming caret for chat */
 .stream-caret::after {
-  content: '';
-  display: inline-block;
-  width: 2px; height: 0.95em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  background: currentColor;
-  border-radius: 2px;
+  content: ''; display: inline-block; width: 2px; height: 0.95em; margin-left: 2px;
+  vertical-align: text-bottom; background: currentColor; border-radius: 2px;
   animation: caretBlink 1s steps(2, start) infinite;
 }
 @keyframes caretBlink { 0%,100% { opacity: 0; } 50% { opacity: 0.8; } }
 
-/* Typing dots */
-.typing-dot {
-  width: 5px; height: 5px; border-radius: 9999px; background: currentColor;
-  animation: typingBounce 1.2s infinite ease-in-out;
-}
+.typing-dot { width: 5px; height: 5px; border-radius: 9999px; background: currentColor; animation: typingBounce 1.2s infinite ease-in-out; }
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .typing-dot:nth-child(3) { animation-delay: 0.3s; }
 @keyframes typingBounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
 
-/* Shimmer skeletons */
-.shimmer {
-  background: linear-gradient(100deg, rgb(var(--surface) / 0.04) 30%, rgb(var(--surface) / 0.10) 50%, rgb(var(--surface) / 0.04) 70%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
+.shimmer { background: linear-gradient(100deg, rgb(var(--panel)/0.04) 30%, rgb(var(--panel)/0.10) 50%, rgb(var(--panel)/0.04) 70%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
-/* Chat scroll container */
 .chat-scroll { scroll-behavior: smooth; overflow-anchor: none; }
 
 @media (prefers-reduced-motion: reduce) {
