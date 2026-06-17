@@ -39,7 +39,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-14 sm:pt-20 pb-16 grid lg:grid-cols-2 gap-12 items-center">
+      <section className="max-w-6xl mx-auto px-6 pt-10 sm:pt-20 pb-12 grid lg:grid-cols-2 gap-12 items-center">
         <div>
           <div className="inline-flex items-center gap-2 glass rounded-full px-3 py-1 mb-6 fade-up">
             <span className="eyebrow text-orange-400">New</span>
@@ -75,7 +75,7 @@ export default function HomePage() {
       <section className="max-w-6xl mx-auto px-6 pb-8">
         <p className="eyebrow text-white/30 text-center mb-5">Built on a fast, modern, $0 stack</p>
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-white/40 text-sm mono">
-          {['Next.js', 'Groq · Llama 3.3', 'pgvector RAG', 'Neon Postgres', 'StackBlitz'].map(t => (
+          {['Groq · Llama 3.3 70B', 'Jina embeddings v3', 'pgvector RAG', 'Neon Postgres', 'Paiza runner', 'Next.js'].map(t => (
             <span key={t}>{t}</span>
           ))}
         </div>
