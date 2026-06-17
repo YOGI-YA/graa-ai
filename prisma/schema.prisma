@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String?
+  image         String?
+  learningStyle String?
+  goals         Goal[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Goal {
+  id           String      @id @default(cuid())
+  title        String
+  description  String
+  category     String
+  durationDays Int?
+  skillLevel   String?
+  planJson     Json?
+  targetDate   DateTime?
+  status       GoalStatus  @default(ACTIVE)
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones   Milestone[]
+  resources    Resource[]
+  tasks        Task[]
+  dayContents  DayContent[]
+  quizzes      Quiz[]
+  quizAttempts QuizAttempt[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  day         Int
+  week        Int?
+  phase       String?
+  title       String
+  description String
+  type        String   @default("lesson")
+  platform    String?
+  url         String?
+  completed   Boolean  @default(false)
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([goalId])
+}
+
+// Cached scraped/curated content per day, so the web is hit only once per day.
+model DayContent {
+  id        String   @id @default(cuid())
+  goalId    String
+  day       Int
+  video     Json?    // { title, url, videoId, thumbnail, channel }
+  docs      Json?    // [{ title, url, source, snippet }]
+  text      Json?    // { summary, sections: [{ heading, body }], keyPoints: [], practiceHint }
+  practice  Json?    // { title, language, instructions, steps[], starterCode, checklist[] }
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([goalId, day])
+}
+
+// RAG vector store. Managed mostly via raw SQL in lib/rag.ts, but declared here
+// (with an Unsupported vector type) so `prisma db push` never drops it.
+// Requires the pgvector extension (created idempotently by ensureStore()).
+model ContentChunk {
+  id        String                      @id
+  goalId    String                      @map("goal_id")
+  day       Int?
+  source    String?
+  content   String
+  embedding Unsupported("vector(384)")?
+
+  @@index([goalId], map: "content_chunks_goal_idx")
+  @@map("content_chunks")
+}
+
+// One MCQ quiz per day. questions include the correct answer + explanation;
+// answers are stripped before sending to the client to take the quiz.
+model Quiz {
+  id        String   @id @default(cuid())
+  goalId    String
+  day       Int
+  questions Json     // [{ question, options: string[], answerIndex, explanation }]
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([goalId, day])
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  goalId    String
+  day       Int
+  userId    String
+  score     Int
+  total     Int
+  passed    Boolean
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([goalId, userId])
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  dueDate     DateTime?
+  status      MilestoneStatus @default(PENDING)
+  order       Int
+  goalId      String
+  goal        Goal            @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Resource {
+  id        String   @id @default(cuid())
+  title     String
+  url       String?
+  type      String
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ABANDONED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}

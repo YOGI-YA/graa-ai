@@ -1,0 +1,246 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Aurora Dark — design system
+   ============================================================ */
+
+:root {
+  --bg: #060713;
+  --bg-soft: #0b0d1c;
+  --surface: 255 255 255;          /* used as rgb(var(--surface) / a) */
+  --border: 255 255 255;
+  --foreground: #e9e9f4;
+  --muted: #a9abc6;
+
+  --accent: 34 211 238;            /* cyan */
+  --accent-2: 139 92 246;          /* violet */
+  --accent-3: 99 102 241;          /* indigo */
+
+  --radius: 16px;
+  --ring: 34 211 238;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  background: var(--bg);
+  color: var(--foreground);
+  font-family: var(--font-inter, 'Inter'), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
+}
+
+/* ---- Global scrollbar ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border) / 0.14) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--border) / 0.14);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgb(var(--border) / 0.26); background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+::selection { background: rgb(var(--accent) / 0.30); color: #fff; }
+
+/* ============================================================
+   Surfaces
+   ============================================================ */
+
+/* No backdrop-filter — it's applied to dozens of cards and is the main cause of
+   scroll/paint jank. A slightly-opaque base over the dark aurora looks just as
+   good and costs nothing. */
+.glass {
+  background: linear-gradient(180deg, rgba(22, 24, 44, 0.55), rgba(16, 18, 34, 0.45));
+  border: 1px solid rgb(var(--border) / 0.09);
+  box-shadow: inset 0 1px 0 rgb(var(--border) / 0.06);
+}
+
+.glass-strong {
+  background: linear-gradient(180deg, rgba(24, 26, 48, 0.92), rgba(14, 16, 32, 0.92));
+  border: 1px solid rgb(var(--border) / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--border) / 0.10),
+    0 24px 60px -20px rgb(0 0 0 / 0.6);
+}
+
+/* Gradient hairline border on hover for interactive cards */
+.card-glow {
+  position: relative;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.card-glow:hover {
+  transform: translateY(-3px);
+  border-color: rgb(var(--accent) / 0.40);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--border) / 0.12),
+    0 18px 50px -22px rgb(var(--accent) / 0.45);
+}
+
+.card-hover {
+  transition: transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgb(var(--accent) / 0.35);
+}
+
+/* ============================================================
+   Text
+   ============================================================ */
+
+/* Static gradient — animating background-position on many elements caused
+   constant repaints. The gradient still looks premium without motion. */
+.gradient-text {
+  background: linear-gradient(110deg, #67e8f9, #818cf8 45%, #c4b5fd 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-balance { text-wrap: balance; }
+
+/* ============================================================
+   Buttons & inputs
+   ============================================================ */
+
+.btn-primary {
+  position: relative;
+  background: linear-gradient(135deg, rgb(var(--accent-3)), rgb(var(--accent-2)));
+  color: #fff;
+  border-radius: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -12px rgb(var(--accent-2) / 0.7);
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, filter 0.2s ease;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -12px rgb(var(--accent-2) / 0.8); filter: brightness(1.07); }
+.btn-primary:active { transform: translateY(0) scale(0.985); }
+.btn-primary:disabled { opacity: 0.6; transform: none; filter: none; cursor: not-allowed; }
+
+.btn-ghost {
+  background: rgb(var(--surface) / 0.05);
+  border: 1px solid rgb(var(--border) / 0.12);
+  color: rgb(var(--foreground) / 0.85);
+  border-radius: 14px;
+  font-weight: 500;
+  transition: transform 0.18s ease, border-color 0.25s ease, background-color 0.25s ease;
+}
+.btn-ghost:hover { transform: translateY(-2px); border-color: rgb(var(--border) / 0.28); background: rgb(var(--surface) / 0.08); }
+.btn-ghost:active { transform: translateY(0) scale(0.985); }
+
+.field {
+  width: 100%;
+  background: rgb(var(--surface) / 0.045);
+  border: 1px solid rgb(var(--border) / 0.10);
+  border-radius: 14px;
+  color: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.field::placeholder { color: rgb(var(--border) / 0.30); }
+.field:focus {
+  outline: none;
+  border-color: rgb(var(--accent) / 0.55);
+  box-shadow: 0 0 0 4px rgb(var(--accent) / 0.12);
+  background: rgb(var(--surface) / 0.06);
+}
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--ring) / 0.45);
+  border-radius: 12px;
+}
+
+/* ============================================================
+   Aurora background
+   ============================================================ */
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* Soft glows via radial gradients — no blur filter, no extra layers. */
+  background:
+    radial-gradient(46vw 40vw at 10% -8%, rgb(var(--accent-3) / 0.30), transparent 60%),
+    radial-gradient(42vw 38vw at 94% -2%, rgb(var(--accent-2) / 0.26), transparent 62%),
+    radial-gradient(50vw 44vw at 62% 112%, rgb(var(--accent) / 0.16), transparent 62%),
+    radial-gradient(120% 120% at 50% 0%, #0a0c1d 0%, var(--bg) 55%);
+}
+.aurora__grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgb(var(--border) / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--border) / 0.035) 1px, transparent 1px);
+  background-size: 60px 60px;
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 28%, transparent 72%);
+  mask-image: radial-gradient(120% 80% at 50% 0%, #000 28%, transparent 72%);
+}
+
+/* ============================================================
+   Entrance & micro animations
+   ============================================================ */
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.fade-up { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.scale-in { animation: scaleIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.msg-in { animation: msgIn 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Stagger helper: set style={{ ['--i']: n }} on children */
+.stagger > * { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+
+/* Streaming caret for chat */
+.stream-caret::after {
+  content: '';
+  display: inline-block;
+  width: 2px; height: 0.95em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  border-radius: 2px;
+  animation: caretBlink 1s steps(2, start) infinite;
+}
+@keyframes caretBlink { 0%,100% { opacity: 0; } 50% { opacity: 0.8; } }
+
+/* Typing dots */
+.typing-dot {
+  width: 5px; height: 5px; border-radius: 9999px; background: currentColor;
+  animation: typingBounce 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typingBounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+/* Shimmer skeletons */
+.shimmer {
+  background: linear-gradient(100deg, rgb(var(--surface) / 0.04) 30%, rgb(var(--surface) / 0.10) 50%, rgb(var(--surface) / 0.04) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* Chat scroll container */
+.chat-scroll { scroll-behavior: smooth; overflow-anchor: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
