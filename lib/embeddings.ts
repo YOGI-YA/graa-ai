@@ -7,8 +7,8 @@ import { pipeline, env, type FeatureExtractionPipeline } from '@xenova/transform
 export const EMBEDDING_DIM = 384
 const MODEL = 'Xenova/all-MiniLM-L6-v2'
 
-// Allow remote download (default) but cache locally inside the project.
-env.cacheDir = './.cache/transformers'
+// Cache the model on disk. On Vercel (read-only FS) the only writable dir is /tmp.
+env.cacheDir = process.env.VERCEL ? '/tmp/transformers' : './.cache/transformers'
 env.allowLocalModels = true
 
 let extractorPromise: Promise<FeatureExtractionPipeline> | null = null
