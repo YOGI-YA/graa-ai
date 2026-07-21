@@ -1,9 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Loader2, Wrench, ListChecks, Terminal, ExternalLink } from 'lucide-react'
+import { Loader2, Wrench, ListChecks, Terminal } from 'lucide-react'
 import CodePlayground from '@/components/CodePlayground'
+import SubmissionPanel from '@/components/SubmissionPanel'
+import ReflectionPanel from '@/components/ReflectionPanel'
+
+type PracticeMode = 'code' | 'submit' | 'reflect'
 
 interface PracticeTask {
+  mode: PracticeMode
   title: string
   language: string
   instructions: string
@@ -11,15 +16,11 @@ interface PracticeTask {
   starterCode: string
   checklist: string[]
   hints: string[]
+  deliverable: string
+  reflectionPrompt: string
 }
 
 const RUNNABLE = new Set(['javascript', 'typescript', 'python', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'php', 'csharp'])
-
-const EXTERNAL: Record<string, { name: string; url: string }> = {
-  html: { name: 'CodePen', url: 'https://codepen.io/pen/' },
-  css: { name: 'CodePen', url: 'https://codepen.io/pen/' },
-  sql: { name: 'SQLite Playground', url: 'https://sqliteonline.com/' },
-}
 
 export default function PracticeSandbox({
   goalId,
@@ -42,7 +43,10 @@ export default function PracticeSandbox({
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load practice')
-        setTask({ ...data.task, hints: data.task.hints ?? [] })
+        const t = data.task
+        const lang = (t.language ?? 'none').toLowerCase()
+        const mode: PracticeMode = t.mode ?? (RUNNABLE.has(lang) ? 'code' : 'submit')
+        setTask({ ...t, mode, language: lang, hints: t.hints ?? [], deliverable: t.deliverable ?? '', reflectionPrompt: t.reflectionPrompt ?? '' })
       })
       .catch(err => {
         if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -53,8 +57,7 @@ export default function PracticeSandbox({
     return () => controller.abort()
   }, [goalId, day])
 
-  const runnable = task ? RUNNABLE.has(task.language.toLowerCase()) : false
-  const external = task ? EXTERNAL[task.language.toLowerCase()] : undefined
+  const mode: PracticeMode = task ? (task.mode === 'code' && !RUNNABLE.has(task.language.toLowerCase()) ? 'submit' : task.mode) : 'submit'
 
   return (
     <section className="glass rounded-2xl p-5 sm:p-6">
@@ -92,22 +95,12 @@ export default function PracticeSandbox({
             </div>
           )}
 
-          {runnable ? (
+          {mode === 'code' ? (
             <CodePlayground goalId={goalId} day={day} task={task} onSolved={onSolved} />
+          ) : mode === 'reflect' ? (
+            <ReflectionPanel goalId={goalId} day={day} task={task} onSolved={onSolved} />
           ) : (
-            <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4 text-sm text-white/55">
-              This task is best done in your own environment{task.language !== 'none' ? ` (${task.language})` : ''}.
-              {external && (
-                <> Try a free editor:{' '}
-                  <a href={external.url} target="_blank" rel="noopener noreferrer" className="text-orange-300 hover:text-orange-200 inline-flex items-center gap-1">
-                    {external.name} <ExternalLink size={12} />
-                  </a>
-                </>
-              )}
-              {task.starterCode && (
-                <pre className="mt-3 bg-black/40 rounded-lg p-3 text-xs mono text-white/70 overflow-x-auto whitespace-pre-wrap">{task.starterCode}</pre>
-              )}
-            </div>
+            <SubmissionPanel goalId={goalId} day={day} task={task} onSolved={onSolved} />
           )}
 
           {task.checklist.length > 0 && (

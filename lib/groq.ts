@@ -2,7 +2,12 @@ import axios from 'axios'
 
 // Groq is OpenAI-compatible and free-tier friendly. Chat only (no embeddings).
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+
+// NVIDIA NIM is OpenAI-compatible too — used as a cross-provider fallback when Groq
+// is fully rate-limited (separate quota entirely).
+const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
+const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -17,32 +22,89 @@ interface GroqChatResponse {
   }>
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/** All configured Groq keys (GROQ_API_KEY, GROQ_API_KEY2, …), deduped, for failover.
+   NOTE: Groq rate limits are per-ORG, so multiple keys from the same account share
+   the same caps — only keys from different accounts add real budget. */
+export function groqKeys(): string[] {
+  return Object.entries(process.env)
+    .filter(([k, v]) => /^GROQ_API_KEY\d*$/.test(k) && Boolean(v))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v as string)
+    .filter((k, i, arr) => arr.indexOf(k) === i)
+}
+
+// Each model has its OWN daily token pool, so when one is capped we switch models.
+// 8b-instant has a large pool (≈500k/day) so it's the dependable fallback.
+function modelChain(primary: string): string[] {
+  return [primary, 'llama-3.1-8b-instant', 'llama-3.3-70b-versatile'].filter((m, i, a) => a.indexOf(m) === i)
+}
+
+// Try Groq across every model × key. Returns content, or null if everything was
+// rate-limited / failed (so the caller can fall back to another provider).
+async function tryGroq(
+  messages: ChatMessage[],
+  options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
+): Promise<string | null> {
+  const keys = options.apiKey ? [options.apiKey] : groqKeys()
+  if (keys.length === 0) return null
+  const models = modelChain(options.model || DEFAULT_MODEL)
+
+  for (let round = 0; round < 2; round++) {
+    for (const model of models) {
+      for (const key of keys) {
+        try {
+          const response = await axios.post<GroqChatResponse>(
+            GROQ_URL,
+            { model, messages, max_tokens: options.maxTokens, temperature: options.temperature, top_p: 0.95, stream: false },
+            { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } }
+          )
+          return response.data.choices?.[0]?.message?.content?.trim() || ''
+        } catch (err) {
+          const status = axios.isAxiosError(err) ? err.response?.status : undefined
+          if (status === 429 || (status && status >= 500)) continue // try next key / model
+          console.error('Groq error', status, axios.isAxiosError(err) ? err.response?.data : err)
+          return null // non-retryable → let NVIDIA try
+        }
+      }
+    }
+    await sleep(1200 * (round + 1))
+  }
+  return null // all Groq attempts rate-limited
+}
+
+// Cross-provider fallback: NVIDIA NIM (OpenAI-compatible, separate quota).
+async function tryNvidia(
+  messages: ChatMessage[],
+  options: { maxTokens: number; temperature: number }
+): Promise<string | null> {
+  const key = process.env.NVIDIA_API_KEY
+  if (!key) return null
+  try {
+    const response = await axios.post<GroqChatResponse>(
+      NVIDIA_URL,
+      { model: NVIDIA_MODEL, messages, max_tokens: options.maxTokens, temperature: options.temperature, top_p: 0.95, stream: false },
+      { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+    return response.data.choices?.[0]?.message?.content?.trim() || ''
+  } catch (err) {
+    console.error('NVIDIA fallback failed', axios.isAxiosError(err) ? err.response?.status : err)
+    return null
+  }
+}
+
 async function createChatCompletion(
   messages: ChatMessage[],
   options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
 ): Promise<string> {
-  const apiKey = options.apiKey || process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY is not configured')
+  const groq = await tryGroq(messages, options)
+  if (groq !== null) return groq
 
-  const response = await axios.post<GroqChatResponse>(
-    GROQ_URL,
-    {
-      model: options.model || DEFAULT_MODEL,
-      messages,
-      max_tokens: options.maxTokens,
-      temperature: options.temperature,
-      top_p: 0.95,
-      stream: false,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const nvidia = await tryNvidia(messages, options)
+  if (nvidia !== null) return nvidia
 
-  return response.data.choices?.[0]?.message?.content?.trim() || ''
+  throw new Error('The AI is busy right now (all free-tier providers are rate-limited). Please try again in a bit.')
 }
 
 export interface MilestoneItem {
@@ -176,7 +238,7 @@ Respond ONLY with a valid JSON object in the exact format below. Infer a concise
 
 Generate 4-6 milestones and 3-5 resources. The "days" array must cover every single day in order, each mapping to the relevant milestone/phase, progressing from fundamentals to practice to a final project.` }], {
     temperature: 0.6,
-    maxTokens: 8000,
+    maxTokens: 3000,
     apiKey,
     model,
   })
@@ -217,7 +279,7 @@ Cover every day in the range, in order, progressing logically from the earlier p
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 4000,
+    maxTokens: 3000,
     apiKey: opts.apiKey,
     model: opts.model,
   })
@@ -362,7 +424,7 @@ Write 3-5 sections, all about "${topic}". Be concrete and practical. Plain text 
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 2200,
+    maxTokens: 1600,
   })
 
   const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -415,7 +477,7 @@ Rules: exactly 4 options per question; answerIndex is the 0-based index of the c
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.4,
-    maxTokens: 2200,
+    maxTokens: 1600,
   })
 
   const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -432,44 +494,61 @@ Rules: exactly 4 options per question; answerIndex is the 0-based index of the c
     }))
 }
 
+export type PracticeMode = 'code' | 'submit' | 'reflect'
+
 export interface PracticeTask {
   title: string
-  language: string // javascript | typescript | python | java | cpp | go | ... | none
+  mode: PracticeMode // code = editor+run, submit = written/graded, reflect = no build, just review
+  language: string // a runnable language (javascript|python|…) OR "none" for non-code fields
   instructions: string
   steps: string[]
   starterCode: string
   checklist: string[]
   hints: string[]
+  deliverable: string // for submit tasks: what the learner submits
+  reflectionPrompt: string // for reflect days: a short question to think through
 }
+
+const RUNNABLE_LANGS = new Set(['javascript', 'typescript', 'python', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'php', 'csharp'])
 
 /** Generate a hands-on practice task for a day, grounded in the day's material. */
 export async function generatePracticeTask(
   topic: string,
   description: string,
   category: string,
-  grounding: string
+  grounding: string,
+  dayType?: string
 ): Promise<PracticeTask> {
-  const prompt = `You are designing a single hands-on practice exercise so the learner applies today's material.
+  const prompt = `You are designing the practice step for one day. Pick the RIGHT mode for the topic and the learner's field — don't force a build where it doesn't fit.
 
 Day topic: ${topic}
 Focus: ${description}
-Goal category: ${category}
+Field / goal category: ${category}
+Day type: ${dayType || 'lesson'}
 
 Material covered:
 ${grounding || '(use accurate general knowledge of the topic)'}
 
+Choose ONE mode:
+- "code" → there's a small program to write. Set "language" to a runnable language (javascript, typescript, python, java, cpp, c, go, rust, ruby, php, csharp) and give runnable "starterCode".
+- "submit" → a non-code field task with a tangible deliverable (UI/UX design, a cybersecurity threat model, an SQL query, a written analysis/plan). Set "language" to "none" and fill "deliverable" (exactly what to write/submit).
+- "reflect" → ONLY for pure review/recap/overview/reading/orientation days where there is genuinely nothing to build or submit. Set "language" to "none" and provide a short "reflectionPrompt" (1 question to think through). Use this sparingly.
+
 Respond ONLY with a valid JSON object in this exact format:
 {
+  "mode": "code" | "submit" | "reflect",
   "title": "short task title",
-  "language": "primary language for the task — one of: javascript, typescript, python, java, cpp, c, go, rust, ruby, php, csharp, sql, or none if it isn't a coding task",
-  "instructions": "2-4 sentences describing the task and the expected outcome",
-  "steps": ["concrete step 1", "step 2", "step 3"],
-  "starterCode": "runnable starter code the learner edits (include a main/entry point and a sample call so Run produces output). Empty string only if language is none.",
-  "checklist": ["done when …", "…"],
+  "language": "a runnable language OR none",
+  "instructions": "2-4 sentences describing the task (or, for reflect, what to review)",
+  "steps": ["step 1", "step 2"],
+  "starterCode": "runnable starter code for code mode (entry point + sample call so Run prints output). Empty otherwise.",
+  "deliverable": "for submit mode: exactly what to write/submit. Empty otherwise.",
+  "reflectionPrompt": "for reflect mode: one reflection question. Empty otherwise.",
+  "checklist": ["done when …"],
   "hints": ["gentle nudge", "more specific hint", "near-solution hint"]
 }
 
-Make the task small enough to finish in one session, directly tied to today's topic, and runnable as-is (it should print something when run). Provide exactly 3 progressively more revealing hints.`
+Keep it small (one session) and tied to today's topic. Code tasks must be runnable as-is. For code/submit modes give exactly 3 progressive hints; reflect mode can have an empty hints array.`
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
@@ -480,14 +559,21 @@ Make the task small enough to finish in one session, directly tied to today's to
   if (!jsonMatch) throw new Error('Failed to parse practice task response')
   const p = JSON.parse(jsonMatch[0]) as Partial<PracticeTask>
 
+  const language = (p.language || 'none').toLowerCase().trim()
+  let mode: PracticeMode = p.mode === 'reflect' || p.mode === 'submit' || p.mode === 'code' ? p.mode : (RUNNABLE_LANGS.has(language) ? 'code' : 'submit')
+  if (mode === 'code' && !RUNNABLE_LANGS.has(language)) mode = 'submit' // can't run it → treat as submit
+
   return {
+    mode,
     title: p.title || topic,
-    language: (p.language || 'none').toLowerCase().trim(),
+    language,
     instructions: p.instructions || '',
     steps: Array.isArray(p.steps) ? p.steps.filter(Boolean) : [],
     starterCode: typeof p.starterCode === 'string' ? p.starterCode : '',
     checklist: Array.isArray(p.checklist) ? p.checklist.filter(Boolean) : [],
     hints: Array.isArray(p.hints) ? p.hints.filter(Boolean) : [],
+    deliverable: typeof p.deliverable === 'string' ? p.deliverable : '',
+    reflectionPrompt: typeof p.reflectionPrompt === 'string' ? p.reflectionPrompt : '',
   }
 }
 
@@ -496,28 +582,26 @@ export interface SubmissionResult {
   feedback: string
 }
 
-/** Evaluate a learner's code submission against the practice task. */
+/** Evaluate a learner's submission (code OR written work) against the practice task. */
 export async function evaluateSubmission(
   task: { title: string; instructions: string; checklist?: string[] },
-  code: string,
-  language: string,
-  runOutput?: string
+  work: string,
+  descriptor: string // e.g. "Python code", "written answer", "UI/UX design description"
 ): Promise<SubmissionResult> {
-  const prompt = `You are a strict-but-fair coding mentor grading a practice submission.
+  const prompt = `You are a strict-but-fair mentor grading a practice submission. Judge it on merit for the learner's field — do not require code if the task isn't a coding task.
 
 Task: ${task.title}
 Instructions: ${task.instructions}
 ${task.checklist?.length ? `Done when:\n- ${task.checklist.join('\n- ')}` : ''}
 
-Language: ${language}
-Submitted code:
-\`\`\`
-${code.slice(0, 6000)}
-\`\`\`
-${runOutput ? `Program output when run:\n${runOutput.slice(0, 1500)}` : ''}
+Submission type: ${descriptor}
+Submission:
+"""
+${work.slice(0, 7000)}
+"""
 
-Decide if the submission genuinely satisfies the task. Respond ONLY with valid JSON:
-{ "passed": true/false, "feedback": "2-3 sentences: what's good, and if failed, exactly what to fix (no full solution)" }`
+Decide if the submission genuinely satisfies the task. Be fair: a thoughtful, correct answer/design/approach passes even if brief. Respond ONLY with valid JSON:
+{ "passed": true/false, "feedback": "2-3 sentences: what's good, and if it fails, exactly what to fix (no full solution)" }`
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.2,
@@ -566,30 +650,44 @@ export async function streamChatWithMentor(
   goalContext?: string,
   options: { apiKey?: string; model?: string } = {}
 ): Promise<ReadableStream<Uint8Array>> {
-  const apiKey = options.apiKey || process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY is not configured')
+  const keys = options.apiKey ? [options.apiKey] : groqKeys()
 
   const systemPrompt = `You are Graa, the AI mentor inside Graa AI — a personalized learning assistant that helps users achieve their educational and professional goals. You provide specific, actionable advice, break down complex topics, and keep users motivated.${goalContext ? ` Current context: ${goalContext}` : ''} Be concise, warm, and practical.`
 
-  const upstream = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: options.model || DEFAULT_MODEL,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      temperature: 0.7,
-      max_tokens: 600,
-      top_p: 0.95,
-      stream: true,
-    }),
+  const body = (model: string) => JSON.stringify({
+    model,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: 0.7,
+    max_tokens: 600,
+    top_p: 0.95,
+    stream: true,
   })
 
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => '')
-    throw new Error(`Groq request failed (${upstream.status}) ${detail}`)
+  // Build the attempt list: every Groq model × key, then NVIDIA as a final fallback.
+  const attempts: { url: string; key: string; model: string }[] = []
+  for (const model of modelChain(options.model || DEFAULT_MODEL)) {
+    for (const key of keys) attempts.push({ url: GROQ_URL, key, model })
+  }
+  if (process.env.NVIDIA_API_KEY) {
+    attempts.push({ url: NVIDIA_URL, key: process.env.NVIDIA_API_KEY, model: NVIDIA_MODEL })
+  }
+  if (attempts.length === 0) throw new Error('No AI provider is configured')
+
+  let upstream: Response | null = null
+  for (const a of attempts) {
+    let res: Response
+    try {
+      res = await fetch(a.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${a.key}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        body: body(a.model),
+      })
+    } catch { continue }
+    if (res.ok && res.body) { upstream = res; break }
+    if (res.status !== 429 && res.status < 500) continue // try next provider/model
+  }
+  if (!upstream || !upstream.body) {
+    throw new Error('The AI mentor is busy right now. Please try again in a moment.')
   }
 
   const reader = upstream.body.getReader()
@@ -630,6 +728,8 @@ export async function streamChatWithMentor(
     },
   })
 }
+
+
 
 export async function chatWithMentor(
   messages: { role: 'user' | 'assistant'; content: string }[],

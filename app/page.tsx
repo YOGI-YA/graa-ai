@@ -24,8 +24,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen text-white overflow-x-hidden">
       {/* Nav */}
-      <nav className="sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto m-3 sm:m-4 px-4 sm:px-6 py-3 flex items-center justify-between glass rounded-2xl">
+      <nav  className="sticky top-0 z-40 ">
+        <div className="max-w-6xl mx-3 my-3 sm:mx-auto sm:my-4 px-4 sm:px-6 py-3 flex items-center justify-between glass rounded-2xl">
           <Logo size={30} />
           <div className="hidden md:flex items-center gap-7 text-sm text-white/55">
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
@@ -75,7 +75,7 @@ export default function HomePage() {
       <section className="max-w-6xl mx-auto px-6 pb-8">
         <p className="eyebrow text-white/30 text-center mb-5">Built on a fast, modern, $0 stack</p>
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-white/40 text-sm mono">
-          {['Groq · Llama 3.3 70B', 'Jina embeddings v3', 'pgvector RAG', 'Neon Postgres', 'Paiza runner', 'Next.js'].map(t => (
+          {['Groq + NVIDIA', 'Jina embeddings v3', 'pgvector RAG', 'Neon Postgres', 'Paiza runner', 'Next.js'].map(t => (
             <span key={t}>{t}</span>
           ))}
         </div>

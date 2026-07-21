@@ -66,7 +66,6 @@ export default function DayLearning({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(task?.completed ?? false)
-  const [toggling, setToggling] = useState(false)
   const [quizPassed, setQuizPassed] = useState(initialQuizPassed)
   const practiceUnlocked = quizPassed || initialQuizPassed
 
@@ -122,30 +121,11 @@ export default function DayLearning({
     }
   }, [goalId, day])
 
-  const setComplete = useCallback(async (value: boolean) => {
-    setToggling(true)
-    setCompleted(value)
-    try {
-      const res = await fetch(`/api/goals/${goalId}/day/${day}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: value }),
-      })
-      if (!res.ok) throw new Error('Failed')
-    } catch {
-      setCompleted(!value)
-    } finally {
-      setToggling(false)
-    }
-  }, [day, goalId])
-
-  const toggleComplete = useCallback(() => setComplete(!completed), [completed, setComplete])
-
-  // Passing the quiz unlocks practice AND auto-completes the day.
-  const handleQuizPassed = useCallback(() => {
-    setQuizPassed(true)
-    setComplete(true)
-  }, [setComplete])
+  // Passing the quiz only UNLOCKS practice — the day completes when the practice
+  // task is submitted and passes (the practice API marks it complete server-side),
+  // so learners must actually do the task before moving on.
+  const handleQuizPassed = useCallback(() => setQuizPassed(true), [])
+  const handlePracticeSolved = useCallback(() => setCompleted(true), [])
 
   const prevDay = day > 1 ? day - 1 : null
   const nextDay = day < totalDays ? day + 1 : null
@@ -301,7 +281,7 @@ export default function DayLearning({
 
             {/* Practice — unlocks after passing the quiz */}
             {practiceUnlocked ? (
-              <PracticeSandbox goalId={goalId} day={day} onSolved={() => setCompleted(true)} />
+              <PracticeSandbox goalId={goalId} day={day} onSolved={handlePracticeSolved} />
             ) : (
               <section className="glass rounded-2xl p-5 sm:p-6 opacity-60">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-2">
@@ -314,18 +294,10 @@ export default function DayLearning({
 
             {/* Actions */}
             <div className="flex items-center justify-between gap-3 pt-2">
-              <button
-                onClick={toggleComplete}
-                disabled={toggling}
-                className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors flex items-center gap-2 ${
-                  completed
-                    ? 'bg-emerald-400 text-emerald-950 hover:bg-emerald-300'
-                    : 'bg-white/8 text-white hover:bg-white/12 border border-white/10'
-                }`}
-              >
-                {toggling ? <Loader2 size={16} className="animate-spin" /> : completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                {completed ? 'Completed' : 'Mark day complete'}
-              </button>
+              <span className={`text-sm font-medium flex items-center gap-2 ${completed ? 'text-emerald-300' : 'text-white/40'}`}>
+                {completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                {completed ? 'Day completed' : 'Finish the practice to complete'}
+              </span>
 
               <div className="flex items-center gap-2">
                 {prevDay && (

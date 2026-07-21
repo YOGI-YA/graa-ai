@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const topic = dayTask?.title || `${goal.title} — day ${day}`
     const grounding = content ? buildGrounding(content.text, content.docs) : ''
 
-    const task = await generatePracticeTask(topic, dayTask?.description || '', goal.category, grounding)
+    const task = await generatePracticeTask(topic, dayTask?.description || '', goal.category, grounding, dayTask?.type)
     const taskJson = task as unknown as Prisma.InputJsonValue
 
     await prisma.dayContent.upsert({
@@ -81,19 +81,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true } })
     if (!goal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const { code, language } = await req.json()
-    if (typeof code !== 'string' || !code.trim()) {
-      return NextResponse.json({ error: 'Code is required' }, { status: 400 })
+    const body = await req.json()
+    // Accept either code (code tasks) or a written submission (non-code field tasks).
+    const work: string = typeof body.code === 'string' && body.code.trim()
+      ? body.code
+      : typeof body.submission === 'string' ? body.submission : ''
+    if (!work.trim()) {
+      return NextResponse.json({ error: 'A submission is required' }, { status: 400 })
     }
 
     const content = await prisma.dayContent.findUnique({ where: { goalId_day: { goalId: id, day } } })
     const task = content?.practice as unknown as PracticeTask | null
     if (!task) return NextResponse.json({ error: 'No practice task for this day' }, { status: 404 })
 
+    const descriptor = body.code
+      ? `${typeof body.language === 'string' ? body.language : task.language} code`
+      : 'written answer / approach'
+
     const result = await evaluateSubmission(
       { title: task.title, instructions: task.instructions, checklist: task.checklist },
-      code,
-      typeof language === 'string' ? language : task.language,
+      work,
+      descriptor,
     )
 
     if (result.passed) {

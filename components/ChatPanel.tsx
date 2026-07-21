@@ -149,7 +149,7 @@ function ChatPanel({ goals, onClose }: { goals: Goal[]; onClose: () => void }) {
             </div>
             <div>
               <p className="text-sm font-semibold">Graa</p>
-              <p className="text-xs text-white/40">Powered by Groq · LLaMA 3.3</p>
+              <p className="text-xs text-white/40">Powered by Groq + NVIDIA</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
