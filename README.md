@@ -81,6 +81,9 @@ npm install
 
 ### 2. Environment (`.env`)
 ```env
+# Public production URL used for SEO metadata, sitemap, and canonical URLs
+NEXT_PUBLIC_SITE_URL="https://graaai.vercel.app"
+
 # Database (Neon or any Postgres; pgvector enabled automatically)
 DATABASE_URL="postgresql://user:password@host/db?sslmode=require"
 
