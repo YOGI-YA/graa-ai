@@ -1,13 +1,33 @@
 import axios from 'axios'
+import fs from 'fs'
+import path from 'path'
+
+function ensureEnvLoaded() {
+  for (const file of ['.env.local', '.env']) {
+    try {
+      const p = path.resolve(process.cwd(), file)
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf-8')
+        for (const line of content.split('\n')) {
+          const match = line.match(/^([A-Za-z0-9_]+)=["']?([^"'\r\n]+)["']?/)
+          if (match && match[1] && match[2] && !process.env[match[1]]) {
+            process.env[match[1]] = match[2]
+          }
+        }
+      }
+    } catch {}
+  }
+}
+ensureEnvLoaded()
 
 // Groq is OpenAI-compatible and free-tier friendly. Chat only (no embeddings).
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'
 
 // NVIDIA NIM is OpenAI-compatible too — used as a cross-provider fallback when Groq
 // is fully rate-limited (separate quota entirely).
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
-const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct'
+const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -28,6 +48,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
    NOTE: Groq rate limits are per-ORG, so multiple keys from the same account share
    the same caps — only keys from different accounts add real budget. */
 export function groqKeys(): string[] {
+  ensureEnvLoaded()
   return Object.entries(process.env)
     .filter(([k, v]) => /^GROQ_API_KEY\d*$/.test(k) && Boolean(v))
     .sort(([a], [b]) => a.localeCompare(b))
@@ -36,9 +57,8 @@ export function groqKeys(): string[] {
 }
 
 // Each model has its OWN daily token pool, so when one is capped we switch models.
-// 8b-instant has a large pool (≈500k/day) so it's the dependable fallback.
 function modelChain(primary: string): string[] {
-  return [primary, 'llama-3.1-8b-instant', 'llama-3.3-70b-versatile'].filter((m, i, a) => a.indexOf(m) === i)
+  return [primary, 'qwen/qwen3.8-27b', 'allam-2-7b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
 }
 
 // Try Groq across every model × key. Returns content, or null if everything was
@@ -60,12 +80,13 @@ async function tryGroq(
             { model, messages, max_tokens: options.maxTokens, temperature: options.temperature, top_p: 0.95, stream: false },
             { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } }
           )
-          return response.data.choices?.[0]?.message?.content?.trim() || ''
+          const content = response.data.choices?.[0]?.message?.content?.trim()
+          if (content) return content
         } catch (err) {
           const status = axios.isAxiosError(err) ? err.response?.status : undefined
-          if (status === 429 || (status && status >= 500)) continue // try next key / model
+          if (status === 429 || status === 404 || status === 400 || (status && status >= 500)) continue // try next key / model
           console.error('Groq error', status, axios.isAxiosError(err) ? err.response?.data : err)
-          return null // non-retryable → let NVIDIA try
+          continue
         }
       }
     }
@@ -159,10 +180,28 @@ export interface RoadmapOptions {
   model?: string
 }
 
+function extractJson<T = any>(content: string): T {
+  let clean = content.trim()
+  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+  const firstBrace = clean.indexOf('{')
+  const lastBrace = clean.lastIndexOf('}')
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+    clean = clean.slice(firstBrace, lastBrace + 1)
+  }
+  try {
+    return JSON.parse(clean)
+  } catch {
+    const relaxed = clean.replace(/,\s*([}\]])/g, '$1')
+    return JSON.parse(relaxed)
+  }
+}
+
 function parseRoadmapJson(content: string): RoadmapDraft {
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Failed to parse AI response')
-  return JSON.parse(jsonMatch[0])
+  try {
+    return extractJson<RoadmapDraft>(content)
+  } catch {
+    throw new Error('Failed to parse AI response')
+  }
 }
 
 export async function generateRoadmapDraft(
@@ -424,12 +463,15 @@ Write 3-5 sections, all about "${topic}". Be concrete and practical. Plain text 
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 1600,
+    maxTokens: 2500,
   })
 
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Failed to parse lesson response')
-  const parsed = JSON.parse(jsonMatch[0]) as Partial<DayLesson>
+  let parsed: Partial<DayLesson> = {}
+  try {
+    parsed = extractJson<Partial<DayLesson>>(content)
+  } catch {
+    throw new Error('Failed to parse lesson response')
+  }
 
   return {
     summary: parsed.summary || '',
@@ -477,12 +519,15 @@ Rules: exactly 4 options per question; answerIndex is the 0-based index of the c
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.4,
-    maxTokens: 1600,
+    maxTokens: 2500,
   })
 
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Failed to parse quiz response')
-  const parsed = JSON.parse(jsonMatch[0]) as { questions?: QuizQuestion[] }
+  let parsed: { questions?: QuizQuestion[] } = {}
+  try {
+    parsed = extractJson<{ questions?: QuizQuestion[] }>(content)
+  } catch {
+    throw new Error('Failed to parse quiz response')
+  }
 
   return (parsed.questions ?? [])
     .filter(q => q && q.question && Array.isArray(q.options) && q.options.length >= 2)
@@ -552,12 +597,15 @@ Keep it small (one session) and tied to today's topic. Code tasks must be runnab
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 2000,
+    maxTokens: 2500,
   })
 
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Failed to parse practice task response')
-  const p = JSON.parse(jsonMatch[0]) as Partial<PracticeTask>
+  let p: Partial<PracticeTask> = {}
+  try {
+    p = extractJson<Partial<PracticeTask>>(content)
+  } catch {
+    throw new Error('Failed to parse practice task response')
+  }
 
   const language = (p.language || 'none').toLowerCase().trim()
   let mode: PracticeMode = p.mode === 'reflect' || p.mode === 'submit' || p.mode === 'code' ? p.mode : (RUNNABLE_LANGS.has(language) ? 'code' : 'submit')
@@ -605,13 +653,11 @@ Decide if the submission genuinely satisfies the task. Be fair: a thoughtful, co
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.2,
-    maxTokens: 400,
+    maxTokens: 500,
   })
 
   try {
-    const match = content.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('no json')
-    const parsed = JSON.parse(match[0]) as Partial<SubmissionResult>
+    const parsed = extractJson<Partial<SubmissionResult>>(content)
     return { passed: Boolean(parsed.passed), feedback: parsed.feedback || 'Reviewed.' }
   } catch {
     return { passed: false, feedback: 'Could not evaluate the submission. Please try again.' }
