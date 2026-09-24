@@ -2,6 +2,11 @@ import { randomUUID } from 'crypto'
 import { prisma } from './prisma'
 import { embed, embedBatch, toVectorLiteral, EMBEDDING_DIM, embeddingsEnabled } from './embeddings'
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> origin/main
 let storeReady: Promise<void> | null = null
 
 export function ensureStore(): Promise<void> {
