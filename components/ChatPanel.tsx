@@ -1,5 +1,7 @@
 'use client'
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { X, Send, Brain, User } from 'lucide-react'
 import type { Goal } from '@/types/goal'
 
@@ -19,18 +21,26 @@ const Bubble = memo(function Bubble({
   streaming?: boolean
 }) {
   return (
-    <div className={`msg-in flex gap-2 ${role === 'user' ? 'flex-row-reverse' : ''}`}>
+    <div className={`msg-in flex gap-2.5 ${role === 'user' ? 'flex-row-reverse' : ''}`}>
       <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
         role === 'assistant' ? 'bg-indigo-500/20' : 'bg-white/10'
       }`}>
         {role === 'assistant' ? <Brain size={12} className="text-indigo-400" /> : <User size={12} className="text-white/60" />}
       </div>
-      <div className={`max-w-[80%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap break-words ${
+      <div className={`max-w-[85%] px-3.5 py-2.5 rounded-xl text-xs leading-relaxed break-words ${
         role === 'user'
-          ? 'bg-indigo-600 text-white rounded-tr-sm'
-          : 'bg-white/5 text-white/85 border border-white/5 rounded-tl-sm'
+          ? 'bg-indigo-600 text-white rounded-tr-sm whitespace-pre-wrap'
+          : 'bg-white/5 text-white/90 border border-white/10 rounded-tl-sm'
       } ${streaming ? 'stream-caret' : ''}`}>
-        {content}
+        {role === 'user' ? (
+          content
+        ) : (
+          <div className="space-y-2 [&>p]:leading-relaxed [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:space-y-1 [&>ol]:list-decimal [&>ol]:pl-4 [&>ol]:space-y-1 [&_table]:w-full [&_table]:my-2 [&_table]:border-collapse [&_th]:border [&_th]:border-white/15 [&_th]:p-1.5 [&_th]:bg-white/10 [&_th]:text-left [&_td]:border [&_td]:border-white/10 [&_td]:p-1.5 [&_code]:bg-white/10 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-indigo-300 [&_code]:font-mono [&_pre]:bg-black/50 [&_pre]:p-2.5 [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-white/10 [&_pre]:overflow-x-auto [&_pre>code]:bg-transparent [&_pre>code]:p-0 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-400 [&_blockquote]:pl-2.5 [&_blockquote]:text-white/70">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   )

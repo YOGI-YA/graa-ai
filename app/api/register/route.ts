@@ -15,7 +15,12 @@ export async function POST(req: NextRequest) {
       data: { name, email, password: hashed, learningStyle },
     })
     return NextResponse.json({ id: user.id, email: user.email, name: user.name })
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  } catch (error: any) {
+    console.error('Registration error:', error)
+    return NextResponse.json(
+      { error: error?.message || 'Server error' },
+      { status: 500 }
+    )
   }
 }
+
