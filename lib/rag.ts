@@ -2,8 +2,7 @@ import { randomUUID } from 'crypto'
 import { prisma } from './prisma'
 import { embed, embedBatch, toVectorLiteral, EMBEDDING_DIM, embeddingsEnabled } from './embeddings'
 
-// Lightweight RAG over pgvector inside the existing Neon Postgres.
-// content_chunks is managed with raw SQL (Prisma 5.7 lacks first-class vector support).
+
 
 let storeReady: Promise<void> | null = null
 

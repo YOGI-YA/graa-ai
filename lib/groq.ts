@@ -1,11 +1,9 @@
 import axios from 'axios'
 
-// Groq is OpenAI-compatible and free-tier friendly. Chat only (no embeddings).
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
 
-// NVIDIA NIM is OpenAI-compatible too — used as a cross-provider fallback when Groq
-// is fully rate-limited (separate quota entirely).
+
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
 const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct'
 
@@ -24,9 +22,7 @@ interface GroqChatResponse {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-/** All configured Groq keys (GROQ_API_KEY, GROQ_API_KEY2, …), deduped, for failover.
-   NOTE: Groq rate limits are per-ORG, so multiple keys from the same account share
-   the same caps — only keys from different accounts add real budget. */
+
 export function groqKeys(): string[] {
   return Object.entries(process.env)
     .filter(([k, v]) => /^GROQ_API_KEY\d*$/.test(k) && Boolean(v))
@@ -35,14 +31,12 @@ export function groqKeys(): string[] {
     .filter((k, i, arr) => arr.indexOf(k) === i)
 }
 
-// Each model has its OWN daily token pool, so when one is capped we switch models.
-// 8b-instant has a large pool (≈500k/day) so it's the dependable fallback.
+
 function modelChain(primary: string): string[] {
   return [primary, 'llama-3.1-8b-instant', 'llama-3.3-70b-versatile'].filter((m, i, a) => a.indexOf(m) === i)
 }
 
-// Try Groq across every model × key. Returns content, or null if everything was
-// rate-limited / failed (so the caller can fall back to another provider).
+
 async function tryGroq(
   messages: ChatMessage[],
   options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
@@ -74,7 +68,6 @@ async function tryGroq(
   return null // all Groq attempts rate-limited
 }
 
-// Cross-provider fallback: NVIDIA NIM (OpenAI-compatible, separate quota).
 async function tryNvidia(
   messages: ChatMessage[],
   options: { maxTokens: number; temperature: number }
@@ -327,7 +320,6 @@ async function fillMissingDays(
   return days
 }
 
-/** Ensure days are sequential, well-formed, and consistent with the duration. */
 function normalizeDraft(draft: RoadmapDraft, requestedDuration: number | null): RoadmapDraft {
   const days = Array.isArray(draft.days) ? draft.days : []
   const normalizedDays = days
@@ -357,8 +349,6 @@ export async function analyzeGoalAndGenerateMilestones(
   learningStyle?: string,
   options: { durationDays?: number | null; skillLevel?: string | null } = {}
 ): Promise<{ milestones: MilestoneItem[]; resources: ResourceItem[]; days: DailyTaskItem[]; advice: string }> {
-  // Delegate to the day-by-day roadmap generator so the modal path produces the
-  // same daily plan as the roadmap builder.
   const prompt = [
     `Goal: ${goalTitle}`,
     goalDescription ? `Details: ${goalDescription}` : '',
@@ -386,10 +376,7 @@ export interface DayLesson {
   practiceHint: string
 }
 
-/**
- * Synthesize a structured, readable lesson for a day, grounded in the scraped
- * snippets when available (falls back to model knowledge if scraping was thin).
- */
+
 export async function generateDayLesson(
   topic: string,
   description: string,
@@ -446,7 +433,6 @@ export interface QuizQuestion {
   explanation: string
 }
 
-/** Generate an MCQ quiz for a day, grounded in the provided content. */
 export async function generateQuiz(
   topic: string,
   description: string,
