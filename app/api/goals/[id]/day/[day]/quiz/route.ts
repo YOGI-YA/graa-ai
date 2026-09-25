@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { generateQuiz, type QuizQuestion } from '@/lib/groq'
+import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -36,6 +37,7 @@ function buildGrounding(text: unknown, docs: unknown): string {
 // GET — return the day's quiz (without answers), generating + caching it once.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -76,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       lastAttempt,
     })
   } catch (error) {
-    console.error('Quiz GET error', error)
+    logger.error('QUIZ', 'Quiz GET error', error)
     return NextResponse.json({ error: 'Failed to load quiz' }, { status: 500 })
   }
 }
@@ -84,6 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // POST — grade submitted answers, record an attempt, return feedback.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -111,9 +114,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: { goalId: id, day, userId: session.user.id, score, total, passed },
     })
 
+    logger.info('QUIZ', 'Quiz submitted and graded', { goalId: id, day, score, total, passed })
     return NextResponse.json({ score, total, passed, passRatio: PASS_RATIO, results })
   } catch (error) {
-    console.error('Quiz POST error', error)
+    logger.error('QUIZ', 'Quiz POST error', error)
     return NextResponse.json({ error: 'Failed to grade quiz' }, { status: 500 })
   }
 }

@@ -2,7 +2,8 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
-import { prisma } from './prisma'
+import { prisma, ensureDatabaseSchema } from './prisma'
+import { logger } from './logger'
 
 const providers: NextAuthOptions['providers'] = [
   CredentialsProvider({
@@ -13,11 +14,26 @@ const providers: NextAuthOptions['providers'] = [
     },
     async authorize(credentials) {
       if (!credentials?.email || !credentials?.password) return null
-      const user = await prisma.user.findUnique({ where: { email: credentials.email } })
-      if (!user || !user.password) return null
-      const valid = await bcrypt.compare(credentials.password, user.password)
-      if (!valid) return null
-      return { id: user.id, email: user.email, name: user.name }
+      try {
+        await ensureDatabaseSchema()
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email.toLowerCase().trim() },
+        })
+        if (!user || !user.password) {
+          logger.warn('AUTH', 'Login failed: user not found or no password set', { email: credentials.email })
+          return null
+        }
+        const valid = await bcrypt.compare(credentials.password, user.password)
+        if (!valid) {
+          logger.warn('AUTH', 'Login failed: incorrect password', { email: credentials.email })
+          return null
+        }
+        logger.info('AUTH', 'User signed in via credentials', { userId: user.id, email: user.email })
+        return { id: user.id, email: user.email, name: user.name }
+      } catch (err) {
+        logger.error('AUTH', 'Unexpected error during credentials authorization', err)
+        return null
+      }
     },
   }),
 ]
@@ -39,30 +55,48 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // For Google sign-ins, make sure a matching user row exists in our DB.
     async signIn({ user, account }) {
-      if (account?.provider === 'google' && user.email) {
-        await prisma.user.upsert({
-          where: { email: user.email },
-          create: { email: user.email, name: user.name || user.email.split('@')[0], image: user.image || null },
-          update: { name: user.name || undefined, image: user.image || undefined },
-        })
+      try {
+        await ensureDatabaseSchema()
+        if (account?.provider === 'google' && user.email) {
+          await prisma.user.upsert({
+            where: { email: user.email.toLowerCase().trim() },
+            create: { email: user.email.toLowerCase().trim(), name: user.name || user.email.split('@')[0], image: user.image || null },
+            update: { name: user.name || undefined, image: user.image || undefined },
+          })
+          logger.info('AUTH', 'User signed in via Google', { email: user.email })
+        }
+        return true
+      } catch (err) {
+        logger.error('AUTH', 'Error during Google sign-in callback', err)
+        return true
       }
-      return true
     },
     async jwt({ token, user, account }) {
-      // Credentials sign-in: user.id is already our DB id.
-      if (user?.id && account?.provider !== 'google') {
-        token.id = user.id
-      }
-      // Google sign-in: resolve our DB id from the email.
-      if (account?.provider === 'google' && token.email) {
-        const dbUser = await prisma.user.findUnique({ where: { email: token.email }, select: { id: true, language: true } })
-        if (dbUser) {
-          token.id = dbUser.id
-          token.language = dbUser.language
+      try {
+        await ensureDatabaseSchema()
+        // Credentials sign-in: user.id is already our DB id.
+        if (user?.id && account?.provider !== 'google') {
+          token.id = user.id
         }
-      } else if (token.id && !token.language) {
-        const dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { language: true } })
-        if (dbUser) token.language = dbUser.language
+        // Google sign-in: resolve our DB id from the email.
+        if (account?.provider === 'google' && token.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email.toLowerCase().trim() },
+            select: { id: true, language: true },
+          })
+          if (dbUser) {
+            token.id = dbUser.id
+            token.language = dbUser.language || 'en'
+          }
+        } else if (token.id && !token.language) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { language: true },
+          })
+          if (dbUser) token.language = dbUser.language || 'en'
+        }
+      } catch (err) {
+        logger.error('AUTH', 'Error in JWT callback', err)
       }
       return token
     },

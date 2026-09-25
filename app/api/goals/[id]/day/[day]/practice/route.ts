@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { generatePracticeTask, evaluateSubmission, type PracticeTask } from '@/lib/groq'
+import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -30,6 +31,7 @@ function buildGrounding(text: unknown, docs: unknown): string {
 // GET — return the day's practice task (generated + cached once). Gated on a passing quiz.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -65,7 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ task })
   } catch (error) {
-    console.error('Practice GET error', error)
+    logger.error('PRACTICE', 'Practice task GET error', error)
     return NextResponse.json({ error: 'Failed to load practice task' }, { status: 500 })
   }
 }
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // POST — evaluate a code submission; mark the day complete if it passes.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -109,9 +112,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await prisma.task.updateMany({ where: { goalId: id, day }, data: { completed: true } })
     }
 
+    logger.info('PRACTICE', 'Practice submission evaluated', { goalId: id, day, passed: result.passed })
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Practice POST error', error)
+    logger.error('PRACTICE', 'Practice submission POST error', error)
     return NextResponse.json({ error: 'Failed to evaluate submission' }, { status: 500 })
   }
 }

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { gatherSources } from '@/lib/scrape'
 import { generateDayLesson } from '@/lib/groq'
 import { indexDayContent } from '@/lib/rag'
+import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -78,12 +79,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
       await indexDayContent(id, day, { lesson: content.text, docs: content.docs })
     } catch (err) {
-      console.error('Failed to index day content for RAG', err)
+      logger.warn('RAG', 'Failed to index day content for RAG', { goalId: id, day, err: String(err) })
     }
 
     return NextResponse.json({ task, content, cached: false })
   } catch (error) {
-    console.error('Day content error', error)
+    logger.error('DAY_LESSON', 'Day content generation error', error)
     return NextResponse.json({ error: 'Failed to load day content' }, { status: 500 })
   }
 }
@@ -91,6 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PATCH — toggle/set the day's completion.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; day: string }> }) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -108,7 +110,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json({ task })
   } catch (error) {
-    console.error('Day complete error', error)
-    return NextResponse.json({ error: 'Failed to update day' }, { status: 500 })
+    logger.error('DAY_LESSON', 'Day completion update error', error)
+    return NextResponse.json({ error: 'Failed to update day progress' }, { status: 500 })
   }
 }

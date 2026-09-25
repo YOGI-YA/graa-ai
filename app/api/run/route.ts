@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -79,8 +80,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Run error', error)
+    logger.error('API /run POST', 'Code execution failed', error)
     const message = error instanceof Error ? error.message : 'Code runner is unavailable right now'
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }
+

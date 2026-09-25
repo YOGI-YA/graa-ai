@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { analyzeGoalAndGenerateMilestones, clampDuration, type MilestoneItem, type ResourceItem, type DailyTaskItem } from '@/lib/groq'
+import { logger } from '@/lib/logger'
 
 function parseDate(value: unknown): Date | null {
   if (!value || typeof value !== 'string') return null
@@ -36,16 +37,22 @@ const goalSelect = {
 
 // GET /api/goals — list the current user's goals (used by the dashboard)
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    await ensureDatabaseSchema()
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const goals = await prisma.goal.findMany({
-    where: { userId: session.user.id },
-    select: goalSelect,
-    orderBy: { createdAt: 'desc' },
-  })
+    const goals = await prisma.goal.findMany({
+      where: { userId: session.user.id },
+      select: goalSelect,
+      orderBy: { createdAt: 'desc' },
+    })
 
-  return NextResponse.json(goals)
+    return NextResponse.json(goals)
+  } catch (error) {
+    logger.error('GOALS', 'Failed to retrieve goals', error)
+    return NextResponse.json({ error: 'Failed to load goals' }, { status: 500 })
+  }
 }
 
 // POST /api/goals — create a goal.
@@ -53,6 +60,7 @@ export async function GET() {
 // bare goal (from the New Goal modal), in which case we generate the plan here.
 export async function POST(req: NextRequest) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -134,10 +142,10 @@ export async function POST(req: NextRequest) {
       select: goalSelect,
     })
 
+    logger.info('GOALS', 'New goal created successfully', { goalId: goal.id, title: goal.title })
     return NextResponse.json({ goal, advice })
   } catch (error) {
-    console.error('Create goal error', error)
-    const message = error instanceof Error ? error.message : 'Failed to create goal'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logger.error('GOALS', 'Failed to create goal', error)
+    return NextResponse.json({ error: 'Failed to create goal roadmap. Please try again.' }, { status: 500 })
   }
 }

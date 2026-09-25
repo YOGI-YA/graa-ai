@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { generateRoadmapDraft } from '@/lib/groq'
+import { logger } from '@/lib/logger'
 
 async function getLearningStyle(userId: string): Promise<string | undefined> {
   try {
+    await ensureDatabaseSchema()
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { learningStyle: true },
     })
     return user?.learningStyle || undefined
   } catch (error) {
-    console.error('Failed to load learning style for roadmap draft', error)
+    logger.warn('ROADMAP', 'Failed to load user learning style for roadmap draft', { userId })
     return undefined
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -36,9 +39,10 @@ export async function POST(req: NextRequest) {
       language: targetLanguage,
     })
 
+    logger.info('ROADMAP', 'Roadmap draft generated successfully', { userId: session.user.id, language: targetLanguage })
     return NextResponse.json({ roadmap: draft })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to generate roadmap'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logger.error('ROADMAP', 'Failed to generate roadmap draft', error)
+    return NextResponse.json({ error: 'Unable to generate roadmap right now. Please try again.' }, { status: 500 })
   }
 }

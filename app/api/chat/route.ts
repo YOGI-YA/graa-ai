@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
 import { streamChatWithMentor } from '@/lib/groq'
 import { retrieve } from '@/lib/rag'
+import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureDatabaseSchema()
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Chat API error', error)
-    return NextResponse.json({ error: 'AI mentor is unavailable right now' }, { status: 502 })
+    logger.error('CHAT', 'Chat streaming error', error)
+    return NextResponse.json({ error: 'AI mentor is unavailable right now. Please try again in a moment.' }, { status: 502 })
   }
 }
