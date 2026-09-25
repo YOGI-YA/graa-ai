@@ -47,8 +47,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const topic = task?.title || `${goal.title} — day ${day}`
     const description = task?.description || ''
 
-    // Search the SPECIFIC day topic; pass the category only as a light disambiguator.
-    const sources = await gatherSources(topic, goal.category)
+    // Search and verify sources using goal title, category, description and language context
+    const sources = await gatherSources(topic, {
+      goalTitle: goal.title,
+      category: goal.category,
+      description,
+      language: goal.language,
+    })
     const lesson = await generateDayLesson(topic, description, sources.snippets, goal.language)
 
     const content = {

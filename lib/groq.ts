@@ -765,6 +765,91 @@ Be specific, warm, and action-oriented. No fluff.`
   return content || 'Keep going, you\'re making great progress!'
 }
 
+export interface VideoCandidateInfo {
+  id: number
+  videoId: string
+  title: string
+  durationSec?: number
+  views?: number
+  channel?: string
+}
+
+export async function verifyAndSelectBestVideo(
+  goalTitle: string,
+  category: string,
+  topic: string,
+  description: string,
+  candidates: VideoCandidateInfo[],
+  language?: string
+): Promise<{ selectedIndex: number; reason: string } | null> {
+  if (!candidates || candidates.length === 0) return null
+
+  const langObj = getLanguage(language)
+  const candidateListStr = candidates.map(c => {
+    const dur = c.durationSec && c.durationSec > 0 ? `${Math.floor(c.durationSec / 60)}m` : 'unknown duration'
+    const v = c.views && c.views > 0 ? `${c.views.toLocaleString()} views` : 'views unlisted'
+    return `[ID: ${c.id}] Title: "${c.title}" | Channel: "${c.channel || 'Unknown'}" | Duration: ${dur} | Views: ${v}`
+  }).join('\n')
+
+  const prompt = `You are an expert AI educational content verifier and curator.
+Your task is to review, compare, and select the single BEST YouTube video for a student's daily lesson.
+
+Student Learning Context:
+- Main Subject/Goal: "${goalTitle}"
+- Category: "${category || 'General'}"
+- Today's Lesson Topic: "${topic}"
+- Lesson Scope / Focus: "${description}"
+- Learner's Language: "${langObj.name}" (${langObj.nativeName})
+
+Found Candidate Videos from YouTube:
+${candidateListStr}
+
+CRITICAL RULES FOR COMPARISON & DISAMBIGUATION:
+1. STRICT DOMAIN & RELEVANCE VERIFICATION:
+   - Ensure the video belongs to the exact subject domain of "${goalTitle}" (${category}).
+   - DISAMBIGUATION EXAMPLE: If the goal is "Cloud Computing", you MUST REJECT videos about meteorological weather clouds, rainfall, UPSC/IAS geography lectures, or climate science. Only accept Cloud Computing / AWS / Azure / GCP / Server architecture tutorials.
+   - If the goal is "Python Programming", you MUST REJECT videos about biological snakes or reptiles.
+   - If the candidate is off-topic, spam, clickbait, or a different subject entirely, DO NOT SELECT IT.
+2. PEDAGOGICAL QUALITY:
+   - Prefer comprehensive, clear tutorials with genuine educational value over 30-second shorts or unrelated exam coaching.
+3. LANGUAGE PREFERENCE:
+   - If learner's language is "${langObj.name}" (and not English), prioritize high-quality tutorials in "${langObj.name}" or bilingual tech channels. If none exist in the candidates, choose the best English tutorial.
+4. If ALL candidates are irrelevant, off-topic, or low quality, return selectedCandidateId: -1.
+
+Respond ONLY with a valid JSON object in this exact format:
+{
+  "selectedCandidateId": <integer: 1-based ID from the candidate list, or -1 if all are off-topic>,
+  "reason": "1 sentence explanation of why this video was chosen and verified"
+}`
+
+  try {
+    const content = await createChatCompletion(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, maxTokens: 400 }
+    )
+    const parsed = extractJson<{ selectedCandidateId?: number; reason?: string }>(content)
+    if (typeof parsed.selectedCandidateId === 'number') {
+      if (parsed.selectedCandidateId >= 1 && parsed.selectedCandidateId <= candidates.length) {
+        return {
+          selectedIndex: parsed.selectedCandidateId - 1,
+          reason: parsed.reason || 'Verified as relevant tutorial',
+        }
+      }
+      if (parsed.selectedCandidateId === -1) {
+        return {
+          selectedIndex: -1,
+          reason: parsed.reason || 'All candidates were off-topic or irrelevant',
+        }
+      }
+    }
+  } catch (err) {
+    console.error('verifyAndSelectBestVideo error:', err)
+  }
+
+  return null
+}
+
+
 
 export async function streamChatWithMentor(
   messages: { role: 'user' | 'assistant'; content: string }[],

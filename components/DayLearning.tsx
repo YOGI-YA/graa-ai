@@ -123,6 +123,27 @@ export default function DayLearning({
     }
   }, [goalId, day])
 
+  const [refreshingVideo, setRefreshingVideo] = useState(false)
+
+  const handleReverifyVideo = useCallback(async () => {
+    setRefreshingVideo(true)
+    try {
+      const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to re-verify video')
+      setContent(prev => prev ? { ...prev, video: data.video } : null)
+      if (data.video) {
+        notify('Video verified and updated', 'success')
+      } else {
+        notify('No verified tutorial video found for this specific subtopic', 'info')
+      }
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Could not update video', 'error')
+    } finally {
+      setRefreshingVideo(false)
+    }
+  }, [goalId, day])
+
   // Passing the quiz only UNLOCKS practice — the day completes when the practice
   // task is submitted and passes (the practice API marks it complete server-side),
   // so learners must actually do the task before moving on.
@@ -186,11 +207,22 @@ export default function DayLearning({
         {!loading && !error && content && (
           <div className="space-y-6 fade-up">
             {/* Video */}
-            {content.video && (
+            {content.video ? (
               <section className="glass rounded-2xl overflow-hidden">
-                <div className="flex items-center gap-2 text-sm font-semibold px-5 pt-5 pb-3">
-                  <PlayCircle size={16} className="text-red-400" />
-                  {t('dayLearning.watchTutorial')}
+                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <PlayCircle size={16} className="text-red-400" />
+                    {t('dayLearning.watchTutorial')}
+                  </div>
+                  <button
+                    onClick={handleReverifyVideo}
+                    disabled={refreshingVideo}
+                    title="Find and AI-verify a different video"
+                    className="text-xs text-white/40 hover:text-orange-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={refreshingVideo ? 'animate-spin' : ''} />
+                    {refreshingVideo ? 'Verifying...' : 'Re-verify Video'}
+                  </button>
                 </div>
                 <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
                   <iframe
@@ -201,9 +233,35 @@ export default function DayLearning({
                     allowFullScreen
                   />
                 </div>
-                <div className="px-5 py-3 text-xs text-white/50">
-                  {content.video.title}{content.video.channel ? ` · ${content.video.channel}` : ''}
+                <div className="px-5 py-3 text-xs text-white/50 flex items-center justify-between gap-4">
+                  <span className="truncate">{content.video.title}{content.video.channel ? ` · ${content.video.channel}` : ''}</span>
+                  <a
+                    href={content.video.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-white/40 hover:text-white flex items-center gap-1 flex-shrink-0"
+                  >
+                    YouTube <ExternalLink size={12} />
+                  </a>
                 </div>
+              </section>
+            ) : (
+              <section className="glass rounded-2xl p-5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <PlayCircle size={20} className="text-white/30" />
+                  <div>
+                    <div className="text-sm font-medium text-white/80">No verified video tutorial attached</div>
+                    <div className="text-xs text-white/40">You can have AI search and verify a relevant tutorial for this topic.</div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleReverifyVideo}
+                  disabled={refreshingVideo}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 flex items-center gap-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+                >
+                  <Sparkles size={13} className="text-orange-300" />
+                  {refreshingVideo ? 'Finding...' : 'Find Video with AI'}
+                </button>
               </section>
             )}
 

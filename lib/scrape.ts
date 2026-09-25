@@ -1,5 +1,8 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import { getLanguage } from './languages'
+import { verifyAndSelectBestVideo, VideoCandidateInfo } from './groq'
+import { logger } from './logger'
 
 // 100% free, no API keys: DuckDuckGo HTML for web search, YouTube results page +
 // oEmbed for a tutorial video, and a lightweight readability pass for article text.
@@ -20,6 +23,20 @@ export interface VideoResult {
   videoId: string
   thumbnail: string
   channel?: string
+}
+
+export interface SearchVideoContext {
+  goalTitle?: string
+  category?: string
+  description?: string
+  language?: string
+}
+
+export interface GatherSourcesOptions {
+  goalTitle?: string
+  category?: string
+  description?: string
+  language?: string
 }
 
 function hostnameOf(url: string): string {
@@ -66,7 +83,7 @@ export async function searchWeb(query: string, limit = 5): Promise<WebResult[]> 
 
     return results
   } catch (error) {
-    console.error('searchWeb failed', query, error instanceof Error ? error.message : error)
+    logger.error('SCRAPE_WEB', 'searchWeb failed for query', { query, error: String(error) })
     return []
   }
 }
@@ -88,18 +105,30 @@ export async function fetchReadable(url: string, maxChars = 3500): Promise<strin
     const text = main.replace(/\s+/g, ' ').trim()
     return text.slice(0, maxChars)
   } catch (error) {
-    console.error('fetchReadable failed', url, error instanceof Error ? error.message : error)
+    logger.warn('SCRAPE_DOC', 'fetchReadable failed for url', { url, error: String(error) })
     return ''
   }
 }
 
-const STOPWORDS = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'on', 'for', 'and', 'with', 'how', 'your', 'you', 'learn', 'tutorial', 'guide', 'course', 'day'])
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'to', 'of', 'in', 'on', 'for', 'and', 'with', 'how', 'your', 'you',
+  'learn', 'tutorial', 'guide', 'course', 'day', 'video', 'watch', 'lecture', 'full',
+  'का', 'की', 'के', 'में', 'पर', 'और', 'से', 'को', 'है', 'हैं', 'क्या', 'कैसे', 'एक'
+])
 
-function keywords(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOPWORDS.has(w))
+function extractKeywords(text: string): string[] {
+  // Support Unicode letters & numbers across scripts (Devanagari, Tamil, Latin, etc.)
+  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []
+  return words.filter(w => w.length > 2 && !STOPWORDS.has(w))
 }
 
-interface Candidate { videoId: string; title: string; durationSec: number; views: number }
+interface RawCandidate {
+  videoId: string
+  title: string
+  durationSec: number
+  views: number
+  channel?: string
+}
 
 function parseDuration(text?: string): number {
   if (!text) return 0
@@ -109,14 +138,12 @@ function parseDuration(text?: string): number {
 }
 
 /**
- * Find the BEST relevant YouTube tutorial: parse several candidates from the
- * results page, then rank by title relevance + sane duration (skips Shorts/live
- * and clickbait-short clips), preferring solid tutorials.
+ * Scrape raw candidate videos from YouTube search results for a given query.
  */
-export async function searchYouTube(query: string): Promise<VideoResult | null> {
+async function fetchYouTubeCandidates(query: string, maxResults = 10): Promise<RawCandidate[]> {
   try {
     const res = await axios.get('https://www.youtube.com/results', {
-      params: { search_query: query, sp: 'EgIQAQ%3D%3D' }, // sp filter = "Video" only (excludes channels/playlists)
+      params: { search_query: query, sp: 'EgIQAQ%3D%3D' }, // Video only
       headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
       timeout: 12000,
       responseType: 'text',
@@ -127,9 +154,9 @@ export async function searchYouTube(query: string): Promise<VideoResult | null> 
     const re = /"videoId":"([a-zA-Z0-9_-]{11})"[\s\S]{0,900}?"title":\{"runs":\[\{"text":"([^"]+)"[\s\S]{0,600}?(?:"lengthText":\{[^}]*?"simpleText":"([0-9:]+)")?[\s\S]{0,400}?(?:"viewCountText":\{[^}]*?"simpleText":"([^"]*)")?/g
 
     const seen = new Set<string>()
-    const candidates: Candidate[] = []
+    const candidates: RawCandidate[] = []
     let m: RegExpExecArray | null
-    while ((m = re.exec(html)) && candidates.length < 12) {
+    while ((m = re.exec(html)) && candidates.length < maxResults) {
       const [, videoId, rawTitle, lengthText, viewsText] = m
       if (seen.has(videoId)) continue
       seen.add(videoId)
@@ -142,42 +169,200 @@ export async function searchYouTube(query: string): Promise<VideoResult | null> 
     }
 
     if (candidates.length === 0) {
-      const fallback = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/)
-      if (!fallback) return null
-      candidates.push({ videoId: fallback[1], title: query, durationSec: 0, views: 0 })
+      // Fallback simpler regex
+      const simpleRe = /"videoId":"([a-zA-Z0-9_-]{11})"[\s\S]{0,600}?"title":\{"runs":\[\{"text":"([^"]+)"/g
+      let sm: RegExpExecArray | null
+      while ((sm = simpleRe.exec(html)) && candidates.length < maxResults) {
+        const [, videoId, rawTitle] = sm
+        if (seen.has(videoId)) continue
+        seen.add(videoId)
+        candidates.push({
+          videoId,
+          title: rawTitle.replace(/\\u0026/g, '&').replace(/\\"/g, '"'),
+          durationSec: 0,
+          views: 0,
+        })
+      }
     }
 
-    const want = keywords(query)
-    const scored = candidates.map((c, i) => {
-      const titleWords = new Set(keywords(c.title))
-      const overlap = want.filter(w => titleWords.has(w)).length
-      const relevance = want.length ? overlap / want.length : 0
-      // Prefer 4–40 min tutorials; penalize Shorts (<70s) and very long.
+    return candidates
+  } catch (error) {
+    logger.warn('SCRAPE_YT', 'fetchYouTubeCandidates failed for query', { query, error: String(error) })
+    return []
+  }
+}
+
+
+/**
+ * Identify known off-topic clash words when studying Technology/Programming topics.
+ * e.g., Cloud Computing != Weather clouds / UPSC geography rainfall / IAS lectures.
+ */
+function isKnownClash(category: string, goalTitle: string, videoTitle: string): boolean {
+  const combined = `${category} ${goalTitle}`.toLowerCase()
+  const vt = videoTitle.toLowerCase()
+
+  const isTechOrCS = /cloud|programming|coding|software|web|data|devops|aws|azure|database|python|javascript|java|react/i.test(combined)
+  if (isTechOrCS) {
+    // Clashes with UPSC / Geography / Atmosphere / Rainfall / Biology
+    if (/\b(upsc|ias|geography|ncert|rainfall|rainfalls|monsoon|cumulus|stratus|types of rain|atmosphere|civil services|gk in hindi)\b/i.test(vt)) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Intelligent YouTube tutorial finder with:
+ * 1. Contextual multi-query generation (including technical and localized queries)
+ * 2. Multi-candidate harvesting
+ * 3. AI verification, comparison & disambiguation (rejecting off-topic / geography / clickbait videos)
+ * 4. Resilient heuristic fallback with domain penalty filtering
+ */
+export async function searchYouTube(
+  topic: string,
+  context: SearchVideoContext = {}
+): Promise<VideoResult | null> {
+  const { goalTitle = '', category = '', description = '', language = 'en' } = context
+  const lang = getLanguage(language)
+
+  // 1. Build targeted search queries to capture both high-precision localized and technical results
+  const queries: string[] = []
+  
+  if (goalTitle && goalTitle.trim() && !topic.toLowerCase().includes(goalTitle.toLowerCase())) {
+    queries.push(`${goalTitle} ${topic} tutorial`)
+  } else {
+    queries.push(`${topic} ${category || 'tutorial'}`.trim())
+  }
+
+  if (language && language !== 'en') {
+    queries.push(`${topic} ${goalTitle || ''} tutorial in ${lang.name}`.trim())
+  }
+
+  if (category && !queries[0].toLowerCase().includes(category.toLowerCase())) {
+    queries.push(`${topic} ${category} tutorial`)
+  }
+
+  logger.info('SCRAPE_YT', 'Searching YouTube with contextual queries', { queries, context })
+
+  // 2. Fetch candidates from queries in parallel
+  const candidateLists = await Promise.all(queries.map(q => fetchYouTubeCandidates(q, 8)))
+  const seenIds = new Set<string>()
+  const rawCandidates: RawCandidate[] = []
+
+  for (const list of candidateLists) {
+    for (const c of list) {
+      if (!seenIds.has(c.videoId)) {
+        seenIds.add(c.videoId)
+        rawCandidates.push(c)
+      }
+    }
+  }
+
+  if (rawCandidates.length === 0) {
+    logger.warn('SCRAPE_YT', 'No YouTube candidates found for queries', { queries })
+    return null
+  }
+
+  // 3. AI Verification & Comparison (Groq / LLM Judge)
+  try {
+    const candidateInfos: VideoCandidateInfo[] = rawCandidates.slice(0, 12).map((c, idx) => ({
+      id: idx + 1,
+      videoId: c.videoId,
+      title: c.title,
+      durationSec: c.durationSec,
+      views: c.views,
+      channel: c.channel,
+    }))
+
+    const decision = await verifyAndSelectBestVideo(
+      goalTitle || topic,
+      category,
+      topic,
+      description,
+      candidateInfos,
+      language
+    )
+
+    if (decision && decision.selectedIndex >= 0 && decision.selectedIndex < rawCandidates.length) {
+      const selected = rawCandidates[decision.selectedIndex]
+      logger.info('SCRAPE_YT', 'AI Verifier selected video', {
+        title: selected.title,
+        videoId: selected.videoId,
+        reason: decision.reason,
+      })
+
+      return await formatVideoResult(selected)
+    } else if (decision && decision.selectedIndex === -1) {
+      logger.warn('SCRAPE_YT', 'AI Verifier rejected all candidates as off-topic', {
+        reason: decision.reason,
+        candidatesCount: rawCandidates.length,
+      })
+      // If AI rejected all due to bad queries, try one strictly English domain-anchored query
+      const strictEnglishQuery = `${goalTitle || category || 'tutorial'} ${topic} full tutorial`.trim()
+      const strictCandidates = await fetchYouTubeCandidates(strictEnglishQuery, 6)
+      const validStrict = strictCandidates.filter(c => !isKnownClash(category, goalTitle, c.title))
+      if (validStrict.length > 0) {
+        return await formatVideoResult(validStrict[0])
+      }
+      return null
+    }
+  } catch (err) {
+    logger.warn('SCRAPE_YT', 'AI Video verification fell back to heuristic scoring', { err: String(err) })
+  }
+
+  // 4. Heuristic Fallback with Unicode Keywords and Clash Penalties
+  const targetKeywords = extractKeywords(`${goalTitle} ${topic} ${category}`)
+  const scored = rawCandidates
+    .map((c, i) => {
+      const titleWords = new Set(extractKeywords(c.title))
+      const overlap = targetKeywords.filter(w => titleWords.has(w)).length
+      const relevance = targetKeywords.length ? overlap / targetKeywords.length : 0
+
+      // Penalize domain collisions (e.g. UPSC geography clouds vs Cloud computing)
+      const isClash = isKnownClash(category, goalTitle, c.title)
+      const clashPenalty = isClash ? -10.0 : 0.0
+
       const dur = c.durationSec
       const durationScore = dur === 0 ? 0.3 : dur < 70 ? -0.5 : dur <= 2400 ? 0.4 : 0.15
       const viewScore = Math.min(0.3, Math.log10(c.views + 1) / 25)
-      const positionScore = (12 - i) / 120 // mild preference for higher results
-      return { c, score: relevance * 1.6 + durationScore + viewScore + positionScore }
-    }).sort((a, b) => b.score - a.score)
+      const positionScore = (12 - i) / 120
 
-    const best = scored[0].c
-    const url = `https://www.youtube.com/watch?v=${best.videoId}`
+      return { c, score: relevance * 2.0 + durationScore + viewScore + positionScore + clashPenalty }
+    })
+    .sort((a, b) => b.score - a.score)
 
-    let title = best.title
-    let channel: string | undefined
-    try {
-      const oembed = await axios.get('https://www.youtube.com/oembed', { params: { url, format: 'json' }, timeout: 8000 })
-      const data = oembed.data as { title?: string; author_name?: string }
-      title = data.title || title
-      channel = data.author_name
-    } catch {
-      // best-effort
-    }
-
-    return { videoId: best.videoId, url, title, channel, thumbnail: `https://i.ytimg.com/vi/${best.videoId}/hqdefault.jpg` }
-  } catch (error) {
-    console.error('searchYouTube failed', query, error instanceof Error ? error.message : error)
+  const topScored = scored[0]
+  if (!topScored || topScored.score < 0) {
+    logger.warn('SCRAPE_YT', 'All candidates failed minimum heuristic threshold', { topic })
     return null
+  }
+
+  return await formatVideoResult(topScored.c)
+}
+
+async function formatVideoResult(candidate: RawCandidate): Promise<VideoResult> {
+  const url = `https://www.youtube.com/watch?v=${candidate.videoId}`
+  let title = candidate.title
+  let channel = candidate.channel
+
+  try {
+    const oembed = await axios.get('https://www.youtube.com/oembed', {
+      params: { url, format: 'json' },
+      timeout: 6000,
+    })
+    const data = oembed.data as { title?: string; author_name?: string }
+    title = data.title || title
+    channel = data.author_name || channel
+  } catch {
+    // best effort oembed
+  }
+
+  return {
+    videoId: candidate.videoId,
+    url,
+    title,
+    channel,
+    thumbnail: `https://i.ytimg.com/vi/${candidate.videoId}/hqdefault.jpg`,
   }
 }
 
@@ -188,23 +373,24 @@ export interface ScrapedSources {
 }
 
 /**
- * Gather raw sources for a day's topic: one video, a few doc links, and the
+ * Gather raw sources for a day's topic: one verified video, a few doc links, and the
  * extracted text of the top couple of docs (used to ground the AI lesson).
- *
- * IMPORTANT: search on the SPECIFIC day topic — never the broader goal — or the
- * results drift (e.g. an "Introduction to HTML" day in a MERN goal must not pull
- * MERN-stack content). `subject` is an optional one-word disambiguator, only
- * appended when the topic is too short to stand on its own.
  */
-export async function gatherSources(topic: string, subject?: string): Promise<ScrapedSources> {
+export async function gatherSources(
+  topic: string,
+  options: GatherSourcesOptions = {}
+): Promise<ScrapedSources> {
+  const { goalTitle = '', category = '', description = '', language = 'en' } = options
   const base = topic.trim()
-  // Only disambiguate very short/generic topics (e.g. "Variables" → "Variables Python").
-  const needsHint = base.split(/\s+/).length <= 2 && subject && !base.toLowerCase().includes(subject.toLowerCase())
-  const q = needsHint ? `${base} ${subject}` : base
+
+  // Clean Web search query with disambiguator
+  const webQuery = goalTitle && !base.toLowerCase().includes(goalTitle.toLowerCase())
+    ? `${goalTitle} ${base} tutorial`
+    : `${base} ${category || 'tutorial'}`
 
   const [docs, video] = await Promise.all([
-    searchWeb(`${q} tutorial`, 5),
-    searchYouTube(`${q} tutorial`),
+    searchWeb(`${webQuery.trim()}`, 5),
+    searchYouTube(base, { goalTitle, category, description, language }),
   ])
 
   // Read the top 2 docs in parallel to build grounding snippets.
@@ -216,3 +402,4 @@ export async function gatherSources(topic: string, subject?: string): Promise<Sc
 
   return { video, docs, snippets }
 }
+
