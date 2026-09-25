@@ -5,22 +5,25 @@ import { signOut } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
 import { LayoutDashboard, Target, User, Plus, LogOut } from 'lucide-react'
 import Logo from '@/components/Logo'
+import LanguageSelector from '@/components/LanguageSelector'
+import { useTranslation } from '@/lib/LanguageContext'
 
 interface AppNavProps {
   firstName?: string
   onNewGoal?: () => void
 }
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, match: (p: string) => p === '/dashboard' },
-  { href: '/goals', label: 'Goals', icon: Target, match: (p: string) => p === '/goals' || p.startsWith('/goals/') },
-]
-
 export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
   const pathname = usePathname()
+  const { t } = useTranslation()
   const initial = (firstName?.trim()?.[0] || '').toUpperCase()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const NAV_ITEMS = [
+    { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, match: (p: string) => p === '/dashboard' },
+    { href: '/goals', label: t('nav.goals'), icon: Target, match: (p: string) => p === '/goals' || p.startsWith('/goals/') },
+  ]
 
   useEffect(() => {
     if (!menuOpen) return
@@ -43,7 +46,7 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
             const active = match(pathname)
             return (
               <Link
-                key={label}
+                key={href}
                 href={href}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
                   active
@@ -59,10 +62,12 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
         </nav>
 
         <div className="flex items-center gap-2">
+          <LanguageSelector variant="compact" />
+
           {onNewGoal && (
             <button onClick={onNewGoal} className="btn-primary hidden sm:flex px-3 py-1.5 text-xs items-center gap-1.5">
               <Plus size={14} />
-              New
+              {t('nav.newGoal')}
             </button>
           )}
 
@@ -78,10 +83,10 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-44 glass-strong rounded-xl p-1.5 scale-in origin-top-right z-50">
+              <div className="absolute right-0 mt-2 w-48 glass-strong rounded-xl p-1.5 scale-in origin-top-right z-50">
                 {firstName && (
                   <div className="px-3 py-2 text-xs text-white/45 border-b border-white/8 mb-1">
-                    Signed in as <span className="text-white/80">{firstName}</span>
+                    {t('nav.signedInAs')} <span className="text-white/80">{firstName}</span>
                   </div>
                 )}
                 <Link
@@ -89,13 +94,13 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-white/75 hover:bg-white/8 hover:text-white transition-colors"
                 >
-                  <User size={15} /> Profile
+                  <User size={15} /> {t('nav.profile')}
                 </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-200/90 hover:bg-red-500/10 transition-colors"
                 >
-                  <LogOut size={15} /> Sign out
+                  <LogOut size={15} /> {t('nav.signOut')}
                 </button>
               </div>
             )}

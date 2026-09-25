@@ -9,6 +9,7 @@ import NewGoalModal from '@/components/NewGoalModal'
 import EmptyRoadmapBuilder from '@/components/EmptyRoadmapBuilder'
 import AppNav from '@/components/AppNav'
 import type { Goal, Milestone } from '@/types/goal'
+import { useTranslation } from '@/lib/LanguageContext'
 
 function greeting() {
   const h = new Date().getHours()
@@ -20,6 +21,7 @@ function greeting() {
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const { t } = useTranslation()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewGoal, setShowNewGoal] = useState(false)
@@ -84,7 +86,7 @@ export default function Dashboard() {
   }, [])
 
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-cyan-300" size={32} /></div>
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-orange-400" size={32} /></div>
   }
 
   return (
@@ -92,7 +94,7 @@ export default function Dashboard() {
       <AppNav firstName={firstName} onNewGoal={goals.length > 0 ? openNewGoal : undefined} />
 
       {loading ? (
-        <div className="flex items-center justify-center py-32"><Loader2 className="animate-spin text-cyan-300" size={28} /></div>
+        <div className="flex items-center justify-center py-32"><Loader2 className="animate-spin text-orange-400" size={28} /></div>
       ) : goals.length === 0 ? (
         <EmptyRoadmapBuilder onCreated={handleGoalCreated} />
       ) : (
@@ -100,7 +102,7 @@ export default function Dashboard() {
           {/* Greeting */}
           <div className="mb-8 fade-up">
             <p className="eyebrow text-orange-400">{greeting()}</p>
-            <h1 className="display text-3xl sm:text-4xl mt-1.5">{firstName ? `Hey, ${firstName}` : 'Dashboard'}</h1>
+            <h1 className="display text-3xl sm:text-4xl mt-1.5">{firstName ? `${t('dashboard.greeting')}, ${firstName}` : t('nav.dashboard')}</h1>
           </div>
 
           {/* Continue learning hero */}
@@ -111,12 +113,12 @@ export default function Dashboard() {
               <div className="relative flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-1.5 eyebrow text-orange-400 mb-3">
-                    <Flame size={12} /> {resume.next ? 'Pick up where you left off' : 'Goal complete'}
+                    <Flame size={12} /> {resume.next ? t('dashboard.continueLearning') : 'Goal complete'}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">{resume.goal.title}</h2>
                   {resume.next ? (
                     <p className="text-white/55 text-sm mt-1.5">
-                      Next · <span className="text-white/80">Day {resume.next.day}</span> — {resume.next.title}
+                      Next · <span className="text-white/80">{t('dayLearning.day')} {resume.next.day}</span> — {resume.next.title}
                     </p>
                   ) : (
                     <p className="text-white/55 text-sm mt-1.5">You&apos;ve completed every day. Revisit lessons anytime.</p>
@@ -128,7 +130,7 @@ export default function Dashboard() {
                       <span className="text-white/70 font-medium">{resume.pct}%</span>
                     </div>
                     <div className="h-2 bg-white/8 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-cyan-400 via-indigo-400 to-violet-500 rounded-full transition-all duration-700" style={{ width: `${resume.pct}%` }} />
+                      <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all duration-700" style={{ width: `${resume.pct}%` }} />
                     </div>
                   </div>
                 </div>
@@ -139,11 +141,11 @@ export default function Dashboard() {
                     className="btn-primary px-6 py-3 text-sm flex items-center justify-center gap-2 group"
                   >
                     <PlayCircle size={17} />
-                    {resume.next ? `Continue · Day ${resume.next.day}` : 'Review roadmap'}
+                    {resume.next ? `${t('dashboard.resumeDay')} ${resume.next.day}` : 'Review roadmap'}
                     <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                   </Link>
                   <Link href={`/goals/${resume.goal.id}`} className="btn-ghost px-6 py-3 text-sm flex items-center justify-center gap-2">
-                    <BookOpen size={16} /> View roadmap
+                    <BookOpen size={16} /> {t('goals.viewRoadmap')}
                   </Link>
                 </div>
               </div>
@@ -153,8 +155,8 @@ export default function Dashboard() {
           {/* Stat strip */}
           <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-10 stagger">
             {[
-              { label: 'Active goals', value: stats.activeGoals },
-              { label: 'Lessons done', value: `${stats.completedLessons}/${stats.totalLessons}` },
+              { label: t('dashboard.activeGoals'), value: stats.activeGoals },
+              { label: t('dashboard.completedDays'), value: `${stats.completedLessons}/${stats.totalLessons}` },
               { label: 'Overall', value: `${stats.overall}%` },
             ].map((s, i) => (
               <div key={s.label} className="glass rounded-2xl p-4 sm:p-5" style={{ ['--i' as string]: i }}>
@@ -167,11 +169,11 @@ export default function Dashboard() {
           {/* Goals */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="display text-xl sm:text-2xl">Your goals</h2>
+              <h2 className="display text-xl sm:text-2xl">{t('goals.title')}</h2>
               <p className="text-white/40 text-sm mt-1">{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {stats.completedGoals} completed</p>
             </div>
             <button onClick={openNewGoal} className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
-              <Plus size={16} /> New goal
+              <Plus size={16} /> {t('goals.newGoal')}
             </button>
           </div>
 

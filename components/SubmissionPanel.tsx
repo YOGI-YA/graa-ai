@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useState } from 'react'
 import { Loader2, Lightbulb, Send, CheckCircle2, Link as LinkIcon } from 'lucide-react'
+import { useTranslation } from '@/lib/LanguageContext'
 
 export default function SubmissionPanel({
   goalId,
@@ -13,6 +14,7 @@ export default function SubmissionPanel({
   task: { title: string; deliverable: string; hints: string[] }
   onSolved?: () => void
 }) {
+  const { t } = useTranslation()
   const [answer, setAnswer] = useState('')
   const [link, setLink] = useState('')
   const [hintsShown, setHintsShown] = useState(0)
@@ -44,12 +46,12 @@ export default function SubmissionPanel({
   return (
     <div className="space-y-3">
       <div>
-        <label className="eyebrow text-white/40 mb-1.5 block">{task.deliverable || 'Your solution'}</label>
+        <label className="eyebrow text-white/40 mb-1.5 block">{task.deliverable || t('practice.yourSolution') || 'Your solution'}</label>
         <textarea
           value={answer}
           onChange={e => setAnswer(e.target.value)}
           rows={6}
-          placeholder="Write your answer, design, approach, or analysis here…"
+          placeholder={t('practice.solutionPlaceholder') || "Write your answer, design, approach, or analysis here…"}
           className="field px-3.5 py-3 text-sm leading-relaxed resize-y min-h-[140px]"
         />
       </div>
@@ -59,7 +61,7 @@ export default function SubmissionPanel({
         <input
           value={link}
           onChange={e => setLink(e.target.value)}
-          placeholder="Optional: link to your work (Figma, repo, doc…)"
+          placeholder={t('practice.linkPlaceholder') || "Optional: link to your work (Figma, repo, doc…)"}
           className="flex-1 bg-transparent text-sm text-white placeholder-white/35 focus:outline-none"
         />
       </div>
@@ -68,10 +70,12 @@ export default function SubmissionPanel({
       {task.hints.length > 0 && (
         <div className="rounded-xl border border-white/8 bg-amber-400/[0.04] p-3">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300"><Lightbulb size={14} /> Suggestions</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+              <Lightbulb size={14} /> {t('practice.suggestions') || 'Suggestions'}
+            </span>
             {hintsShown < task.hints.length && (
               <button onClick={() => setHintsShown(n => n + 1)} className="text-xs text-amber-300/80 hover:text-amber-200">
-                {hintsShown === 0 ? 'Show a suggestion' : 'Next suggestion'} ({hintsShown}/{task.hints.length})
+                {hintsShown === 0 ? (t('practice.showSuggestion') || 'Show a suggestion') : (t('practice.nextSuggestion') || 'Next suggestion')} ({hintsShown}/{task.hints.length})
               </button>
             )}
           </div>
@@ -92,12 +96,12 @@ export default function SubmissionPanel({
           className="btn-primary px-5 py-2.5 text-sm flex items-center gap-2"
         >
           {submitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-          Submit for review
+          {t('practice.submitReview') || 'Submit for review'}
         </button>
         {result && (
           <span className={`text-sm flex items-center gap-1.5 ${result.passed ? 'text-emerald-300' : 'text-amber-300'}`}>
             {result.passed && <CheckCircle2 size={15} />}
-            {result.passed ? 'Passed!' : 'Keep going'}
+            {result.passed ? (t('practice.passed') || 'Passed!') : (t('practice.keepGoing') || 'Keep going')}
           </span>
         )}
       </div>

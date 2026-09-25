@@ -1,9 +1,12 @@
+'use client'
 import Link from 'next/link'
 import {
   Target, MessageSquare, BookOpen, GraduationCap, Wrench, Sparkles, ArrowRight,
   PlayCircle, FileText, Bot, Check,
 } from 'lucide-react'
 import Logo from '@/components/Logo'
+import LanguageSelector from '@/components/LanguageSelector'
+import { useTranslation } from '@/lib/LanguageContext'
 
 const FEATURES = [
   { icon: Target, title: 'Day-by-day roadmaps', desc: 'Describe a goal. Get a structured plan split into focused daily lessons — the AI even sizes the timeline for you.', color: 'text-orange-400', bg: 'bg-orange-500/12' },
@@ -21,19 +24,22 @@ const STEPS = [
 ]
 
 export default function HomePage() {
+  const { t } = useTranslation()
+
   return (
     <div className="min-h-screen text-white overflow-x-hidden">
       {/* Nav */}
-      <nav  className="sticky top-0 z-40 ">
+      <nav className="sticky top-0 z-40">
         <div className="max-w-6xl mx-3 my-3 sm:mx-auto sm:my-4 px-4 sm:px-6 py-3 flex items-center justify-between glass rounded-2xl">
           <Logo size={30} />
           <div className="hidden md:flex items-center gap-7 text-sm text-white/55">
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
           </div>
-          <div className="flex items-center gap-2.5">
-            <Link href="/login" className="btn-outline px-4 py-2 text-sm">Login</Link>
-            <Link href="/register" className="btn-primary px-4 py-2 text-sm">Get started</Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSelector variant="compact" />
+            <Link href="/login" className="btn-outline px-3 sm:px-4 py-2 text-xs sm:text-sm">{t('nav.signIn') || "Login"}</Link>
+            <Link href="/register" className="btn-primary px-3 sm:px-4 py-2 text-xs sm:text-sm">{t('nav.getStarted') || "Get started"}</Link>
           </div>
         </div>
       </nav>
@@ -43,24 +49,21 @@ export default function HomePage() {
         <div>
           <div className="inline-flex items-center gap-2 glass rounded-full px-3 py-1 mb-6 fade-up">
             <span className="eyebrow text-orange-400">New</span>
-            <span className="text-sm text-white/70">Your goal → a roadmap in seconds</span>
+            <span className="text-sm text-white/70">{t('home.badge') || "Your goal → a roadmap in seconds"}</span>
           </div>
           <h1 className="display text-5xl sm:text-7xl text-balance fade-up" style={{ animationDelay: '50ms' }}>
             Learn anything,<br />
             <span className="text-orange-500">day by day</span>
           </h1>
           <p className="text-lg text-white/60 mt-6 max-w-lg leading-relaxed fade-up" style={{ animationDelay: '110ms' }}>
-            Graa turns any goal into a day-by-day roadmap with curated lessons, quizzes,
-            and hands-on practice. Learning that’s <span className="text-orange-400 font-semibold">focused</span>,{' '}
-            <span className="text-blue-400 font-semibold">practical</span> &amp;{' '}
-            <span className="text-rose-400 font-semibold">actually finishable</span>.
+            {t('home.heroSubtitle') || "Graa turns any goal into a day-by-day roadmap with curated lessons, quizzes, and hands-on practice."}
           </p>
           <div className="flex flex-wrap items-center gap-3 mt-9 fade-up" style={{ animationDelay: '170ms' }}>
             <Link href="/register" className="btn-primary px-7 py-3.5 text-sm inline-flex items-center gap-2 group">
-              Start learning — free
+              {t('home.startFree') || "Start learning — free"}
               <ArrowRight size={17} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
-            <a href="#how" className="btn-ghost px-7 py-3.5 text-sm">See how it works</a>
+            <a href="#how" className="btn-ghost px-7 py-3.5 text-sm">{t('home.exploreFeatures') || "See how it works"}</a>
           </div>
           <p className="eyebrow text-white/35 mt-5 fade-up" style={{ animationDelay: '210ms' }}>No credit card · Free to use</p>
         </div>

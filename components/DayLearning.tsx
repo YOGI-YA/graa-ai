@@ -8,6 +8,7 @@ import {
 import QuizPanel from '@/components/QuizPanel'
 import PracticeSandbox from '@/components/PracticeSandbox'
 import { notify } from '@/components/Toast'
+import { useTranslation } from '@/lib/LanguageContext'
 
 interface TaskInfo {
   day: number
@@ -62,6 +63,7 @@ export default function DayLearning({
   initialQuizPassed?: boolean
   lastAttempt?: { score: number; total: number; passed: boolean } | null
 }) {
+  const { t } = useTranslation()
   const [content, setContent] = useState<DayContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -163,12 +165,12 @@ export default function DayLearning({
 
         {/* Header */}
         <div className="mb-8">
-          <div className="inline-flex items-center gap-2 bg-cyan-400/10 border border-cyan-300/20 rounded-full px-3 py-1 text-xs text-cyan-100 mb-4">
+          <div className="inline-flex items-center gap-2 bg-orange-400/10 border border-orange-300/20 rounded-full px-3 py-1 text-xs text-orange-200 mb-4">
             <Sparkles size={13} />
-            Day {day} of {totalDays}
-            {task?.type && <span className="text-cyan-200/50">· {task.type}</span>}
+            {t('dayLearning.day')} {day} of {totalDays}
+            {task?.type && <span className="text-orange-200/50">· {task.type}</span>}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-semibold leading-tight">{task?.title || `Day ${day}`}</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold leading-tight">{task?.title || `${t('dayLearning.day')} ${day}`}</h1>
           {task?.description && <p className="text-white/55 text-sm sm:text-base leading-relaxed mt-3">{task.description}</p>}
         </div>
 
@@ -177,7 +179,7 @@ export default function DayLearning({
         {error && !loading && (
           <div className="glass rounded-2xl p-6 text-center">
             <p className="text-red-300 text-sm mb-3">{error}</p>
-            <button onClick={() => location.reload()} className="text-cyan-300 text-sm hover:text-cyan-200">Try again</button>
+            <button onClick={() => location.reload()} className="text-orange-300 text-sm hover:text-orange-200">Try again</button>
           </div>
         )}
 
@@ -188,7 +190,7 @@ export default function DayLearning({
               <section className="glass rounded-2xl overflow-hidden">
                 <div className="flex items-center gap-2 text-sm font-semibold px-5 pt-5 pb-3">
                   <PlayCircle size={16} className="text-red-400" />
-                  Watch
+                  {t('dayLearning.watchTutorial')}
                 </div>
                 <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
                   <iframe
@@ -210,7 +212,7 @@ export default function DayLearning({
               <section className="glass rounded-2xl p-5 sm:p-6">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-3">
                   <BookOpen size={16} className="text-emerald-300" />
-                  Today&apos;s lesson
+                  {t('dayLearning.lessonSummary')}
                 </div>
                 {lesson.summary && <p className="text-white/70 text-sm leading-relaxed mb-5">{lesson.summary}</p>}
                 <div className="space-y-5">
@@ -224,14 +226,14 @@ export default function DayLearning({
 
                 {lesson.keyPoints.length > 0 && (
                   <div className="mt-6 bg-white/[0.03] border border-white/8 rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200 mb-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-orange-200 mb-2">
                       <ListChecks size={14} />
-                      Key takeaways
+                      {t('dayLearning.keyConcepts')}
                     </div>
                     <ul className="space-y-1.5">
                       {lesson.keyPoints.map((k, i) => (
                         <li key={i} className="text-white/60 text-sm flex gap-2">
-                          <span className="text-cyan-400 flex-shrink-0">•</span>
+                          <span className="text-orange-400 flex-shrink-0">•</span>
                           {k}
                         </li>
                       ))}
@@ -252,8 +254,8 @@ export default function DayLearning({
             {content.docs && content.docs.length > 0 && (
               <section className="glass rounded-2xl p-5 sm:p-6">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-4">
-                  <BookOpen size={16} className="text-indigo-300" />
-                  Read &amp; explore
+                  <BookOpen size={16} className="text-orange-300" />
+                  {t('dayLearning.documentation')}
                 </div>
                 <div className="space-y-2">
                   {content.docs.map((d, i) => (
@@ -262,7 +264,7 @@ export default function DayLearning({
                       href={d.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block rounded-xl border border-white/8 hover:border-cyan-300/40 hover:bg-white/[0.04] transition-all p-3"
+                      className="block rounded-xl border border-white/8 hover:border-orange-300/40 hover:bg-white/[0.04] transition-all p-3"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-sm font-medium truncate">{d.title}</span>
@@ -285,10 +287,10 @@ export default function DayLearning({
             ) : (
               <section className="glass rounded-2xl p-5 sm:p-6 opacity-60">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-2">
-                  <Sparkles size={16} className="text-cyan-300" />
-                  Practice
+                  <Sparkles size={16} className="text-orange-300" />
+                  {t('dayLearning.practiceTask')}
                 </div>
-                <p className="text-white/40 text-sm">Pass the knowledge check above to unlock today&apos;s hands-on practice.</p>
+                <p className="text-white/40 text-sm">{t('dayLearning.quizRequired')}</p>
               </section>
             )}
 
@@ -296,26 +298,26 @@ export default function DayLearning({
             <div className="flex items-center justify-between gap-3 pt-2">
               <span className={`text-sm font-medium flex items-center gap-2 ${completed ? 'text-emerald-300' : 'text-white/40'}`}>
                 {completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                {completed ? 'Day completed' : 'Finish the practice to complete'}
+                {completed ? t('dayLearning.dayCompleted') : 'Finish the practice to complete'}
               </span>
 
               <div className="flex items-center gap-2">
                 {prevDay && (
                   <Link href={`/goals/${goalId}/day/${prevDay}`} className="btn-ghost px-3 py-2.5 text-sm flex items-center gap-1">
-                    <ChevronLeft size={16} /> Day {prevDay}
+                    <ChevronLeft size={16} /> {t('dayLearning.day')} {prevDay}
                   </Link>
                 )}
                 {nextDay && (
                   completed ? (
                     <Link href={`/goals/${goalId}/day/${nextDay}`} className="btn-primary px-4 py-2.5 text-sm flex items-center gap-1">
-                      Day {nextDay} <ChevronRight size={16} />
+                      {t('dayLearning.day')} {nextDay} <ChevronRight size={16} />
                     </Link>
                   ) : (
                     <span
                       title="Complete this day to unlock the next"
                       className="px-4 py-2.5 text-sm rounded-full bg-white/5 border border-white/10 text-white/35 flex items-center gap-1.5 cursor-not-allowed"
                     >
-                      <Lock size={14} /> Day {nextDay}
+                      <Lock size={14} /> {t('dayLearning.day')} {nextDay}
                     </span>
                   )
                 )}

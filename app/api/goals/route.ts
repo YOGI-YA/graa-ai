@@ -19,6 +19,7 @@ const goalSelect = {
   targetDate: true,
   durationDays: true,
   skillLevel: true,
+  language: true,
   planJson: true,
   milestones: {
     select: { id: true, title: true, description: true, status: true, dueDate: true, order: true },
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
     const title = typeof body.title === 'string' ? body.title.trim() : ''
     const description = typeof body.description === 'string' ? body.description.trim() : ''
     const category = typeof body.category === 'string' && body.category.trim() ? body.category.trim() : 'Other'
+    const language = typeof body.language === 'string' && body.language.trim() ? body.language.trim() : (session.user.language || 'en')
 
     if (!title) return NextResponse.json({ error: 'Title is required' }, { status: 400 })
 
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
     let advice: string = typeof body.advice === 'string' ? body.advice : ''
     let durationDays = clampDuration(body.durationDays)
 
-    // No plan supplied (New Goal modal path) → generate one.
+    // No plan supplied (New Goal modal path) → generate one in the user's language.
     if (milestones.length === 0) {
       const generated = await analyzeGoalAndGenerateMilestones(
         title,
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
         category,
         body.targetDate || undefined,
         undefined,
-        { durationDays, skillLevel },
+        { durationDays, skillLevel, language },
       )
       milestones = generated.milestones
       resources = generated.resources
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest) {
         targetDate,
         durationDays,
         skillLevel,
+        language,
         planJson: body.milestones ? body : undefined,
         userId: session.user.id,
         milestones: {

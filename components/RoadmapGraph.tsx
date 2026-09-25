@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ArrowLeft, CheckCircle2, ChevronLeft, Circle, Lock, Play, Sparkles, Trophy } from 'lucide-react'
 import type { Goal, Milestone } from '@/types/goal'
 import AppNav from '@/components/AppNav'
+import { useTranslation } from '@/lib/LanguageContext'
 
 function isUnlocked(milestones: Milestone[], index: number) {
   if (index === 0) return true
@@ -39,6 +40,7 @@ function makeLessonNodes(milestone: Milestone, resourceTitles: string[]) {
 }
 
 export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
+  const { t } = useTranslation()
   const [goal, setGoal] = useState(initialGoal)
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [loadingMilestone, setLoadingMilestone] = useState<string | null>(null)
@@ -120,7 +122,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
         <div className="flex items-center justify-between gap-4 mb-8">
           <Link href="/dashboard" className="text-white/45 hover:text-white transition-colors flex items-center gap-2 text-sm">
             <ArrowLeft size={16} />
-            Dashboard
+            {t('nav.dashboard') || 'Dashboard'}
           </Link>
           <div className="text-xs text-white/35">{goal.category}</div>
         </div>
@@ -129,7 +131,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
           <div className="max-w-3xl mb-10">
             <div className="inline-flex items-center gap-2 bg-cyan-400/10 border border-cyan-300/20 rounded-full px-3 py-1 text-xs text-cyan-100 mb-4">
               <Sparkles size={13} />
-              Learning Roadmap
+              {t('roadmap.learningRoadmap') || 'Learning Roadmap'}
             </div>
             <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">{goal.title}</h1>
             <p className="text-white/52 text-sm sm:text-base leading-relaxed mt-4">{goal.description}</p>
@@ -137,7 +139,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
             {tasks.length > 0 && (
               <div className="mt-7 max-w-md">
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-white/45">{doneCount} of {tasks.length} days complete</span>
+                  <span className="text-white/45">{t('roadmap.daysComplete', { done: doneCount, total: tasks.length }) || `${doneCount} of ${tasks.length} days complete`}</span>
                   <span className="text-white/70 font-medium">{pct}%</span>
                 </div>
                 <div className="h-2 bg-white/8 rounded-full overflow-hidden">
@@ -148,7 +150,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                   className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2 mt-4"
                 >
                   <Play size={15} />
-                  {nextTask ? `Continue · Day ${nextTask.day}` : 'Review from Day 1'}
+                  {nextTask ? (t('roadmap.continueDay', { day: nextTask.day }) || `Continue · Day ${nextTask.day}`) : (t('roadmap.reviewFromDay1') || 'Review from Day 1')}
                 </Link>
               </div>
             )}
@@ -180,7 +182,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                           {completed ? <CheckCircle2 size={21} /> : unlocked ? <Play size={18} /> : <Lock size={17} />}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs text-white/36 mb-1">Phase {index + 1}</div>
+                          <div className="text-xs text-white/36 mb-1">{t('roadmap.phase', { phase: index + 1 }) || `Phase ${index + 1}`}</div>
                           <h2 className="font-semibold text-base sm:text-lg leading-snug">{milestone.title}</h2>
                           <p className="text-white/45 text-sm leading-relaxed mt-2 line-clamp-2">{milestone.description}</p>
                         </div>
@@ -201,8 +203,8 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
           {tasks.length > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Daily lessons</h2>
-                <span className="text-xs text-white/35">{tasks.filter(t => t.completed).length}/{tasks.length} done</span>
+                <h2 className="text-lg font-semibold">{t('roadmap.dailyLessons') || 'Daily lessons'}</h2>
+                <span className="text-xs text-white/35">{t('roadmap.phaseLessons', { done: tasks.filter(t => t.completed).length, total: tasks.length }) || `${tasks.filter(t => t.completed).length}/${tasks.length} done`}</span>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {tasks.map(task => {
@@ -211,14 +213,14 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                     return (
                       <div
                         key={task.id}
-                        title="Complete the previous day to unlock"
+                        title={t('roadmap.lockedTooltip') || "Complete the previous day to unlock"}
                         className="flex items-start gap-3 rounded-xl border border-white/8 p-3 opacity-50 cursor-not-allowed"
                       >
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/5 text-white/30">
                           <Lock size={14} />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-[11px] text-white/30">Day {task.day}{task.type ? ` · ${task.type}` : ''}</div>
+                          <div className="text-[11px] text-white/30">{t('dayLearning.day') || 'Day'} {task.day}{task.type ? ` · ${task.type}` : ''}</div>
                           <div className="text-sm font-medium truncate text-white/45">{task.title}</div>
                         </div>
                       </div>
@@ -236,7 +238,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                         {task.completed ? <CheckCircle2 size={16} /> : task.day}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[11px] text-white/35">Day {task.day}{task.type ? ` · ${task.type}` : ''}</div>
+                        <div className="text-[11px] text-white/35">{t('dayLearning.day') || 'Day'} {task.day}{task.type ? ` · ${task.type}` : ''}</div>
                         <div className="text-sm font-medium truncate group-hover:text-orange-100 transition-colors">{task.title}</div>
                       </div>
                       <Play size={15} className="ml-auto text-white/25 group-hover:text-orange-300 transition-colors flex-shrink-0 mt-1" />
@@ -255,12 +257,12 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
               className="text-white/45 hover:text-white transition-colors flex items-center gap-2 text-sm mb-8"
             >
               <ChevronLeft size={16} />
-              Back to roadmap
+              {t('roadmap.backToRoadmap') || 'Back to roadmap'}
             </button>
 
             <div className="max-w-3xl mb-10">
               <div className="inline-flex items-center gap-2 bg-emerald-400/10 border border-emerald-300/20 rounded-full px-3 py-1 text-xs text-emerald-100 mb-4">
-                Phase {selectedIndex + 1}
+                {t('roadmap.phase', { phase: selectedIndex + 1 }) || `Phase ${selectedIndex + 1}`}
               </div>
               <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">{selectedMilestone.title}</h1>
               <p className="text-white/52 text-sm sm:text-base leading-relaxed mt-4">{selectedMilestone.description}</p>
@@ -282,7 +284,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                       }`}>
                         {unlocked ? <Circle size={18} /> : <Lock size={16} />}
                       </div>
-                      <div className="text-xs text-white/35 mb-1">Module {index + 1}</div>
+                      <div className="text-xs text-white/35 mb-1">{t('roadmap.module', { module: index + 1 }) || `Module ${index + 1}`}</div>
                       <h2 className="font-semibold text-sm leading-snug">{node.title}</h2>
                       <p className="text-white/45 text-xs leading-relaxed mt-2">{node.description}</p>
                     </div>
@@ -302,7 +304,7 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                 ) : (
                   <CheckCircle2 size={16} />
                 )}
-                {selectedMilestone.status === 'COMPLETED' ? 'Mark as active' : 'Complete day'}
+                {selectedMilestone.status === 'COMPLETED' ? (t('roadmap.markAsActive') || 'Mark as active') : (t('roadmap.completeDay') || 'Complete day')}
               </button>
             </div>
           </section>

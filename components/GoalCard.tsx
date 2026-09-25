@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo, useState } from 'react'
 import { Target, ChevronDown, ChevronUp, CheckCircle, Circle, Clock, BookOpen, Trash2, ExternalLink, Route } from 'lucide-react'
 import type { Goal, Milestone } from '@/types/goal'
 import { notify, confirmDialog } from '@/components/Toast'
+import { useTranslation } from '@/lib/LanguageContext'
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-indigo-500/20 text-indigo-300',
@@ -28,6 +29,7 @@ interface GoalCardProps {
 }
 
 function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [loadingMilestone, setLoadingMilestone] = useState<string | null>(null)
@@ -72,9 +74,9 @@ function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
 
   const deleteGoal = useCallback(async () => {
     const ok = await confirmDialog({
-      title: 'Delete this goal?',
-      message: `“${goal.title}” and all its days, lessons, and progress will be permanently removed.`,
-      confirmLabel: 'Delete',
+      title: t('goals.deleteGoal') || 'Delete this goal?',
+      message: `“${goal.title}” — ${t('goals.confirmDelete') || 'Are you sure you want to delete this goal? This cannot be undone.'}`,
+      confirmLabel: t('common.delete') || 'Delete',
       danger: true,
     })
     if (!ok) return
@@ -88,7 +90,7 @@ function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
       console.error(error)
       notify('Could not delete the goal. Please try again.', 'error')
     }
-  }, [goal.id, goal.title, onDeleted])
+  }, [goal.id, goal.title, onDeleted, t])
 
   return (
     <div className="glass card-glow rounded-2xl overflow-hidden">
@@ -140,14 +142,14 @@ function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
             className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
           >
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {expanded ? 'Hide details' : `View ${goal.milestones.length} milestones & resources`}
+            {expanded ? (t('common.close') || 'Hide details') : `View ${goal.milestones.length} milestones & resources`}
           </button>
           <Link
             href={`/goals/${goal.id}`}
             className="flex items-center gap-1.5 text-xs text-cyan-200/70 hover:text-cyan-100 transition-colors"
           >
             <Route size={13} />
-            Roadmap
+            {t('goals.viewRoadmap') || 'Roadmap'}
           </Link>
         </div>
       </div>

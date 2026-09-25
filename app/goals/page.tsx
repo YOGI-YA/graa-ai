@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Loader2, Target, Plus, ArrowRight, CalendarDays } from 'lucide-react'
 import AppNav from '@/components/AppNav'
 import type { Goal } from '@/types/goal'
+import { useTranslation } from '@/lib/LanguageContext'
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-indigo-500/20 text-indigo-200',
@@ -27,6 +28,7 @@ function progressOf(goal: Goal) {
 
 export default function GoalsPage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,11 +54,11 @@ export default function GoalsPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
         <div className="flex items-end justify-between gap-4 mb-8 fade-up">
           <div>
-            <h1 className="display text-3xl sm:text-4xl">Your goals</h1>
-            <p className="text-white/50 text-sm mt-2">Pick a goal to open its roadmap and daily lessons.</p>
+            <h1 className="display text-3xl sm:text-4xl">{t('goals.title') || 'Your goals'}</h1>
+            <p className="text-white/50 text-sm mt-2">{t('goals.subtitle') || 'Pick a goal to open its roadmap and daily lessons.'}</p>
           </div>
           <Link href="/dashboard" className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
-            <Plus size={16} /> New goal
+            <Plus size={16} /> {t('goals.newGoal') || 'New goal'}
           </Link>
         </div>
 
@@ -69,10 +71,10 @@ export default function GoalsPage() {
             <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-400/15 flex items-center justify-center mx-auto mb-4">
               <Target size={22} className="text-indigo-200" />
             </div>
-            <h2 className="text-xl font-semibold">No goals yet</h2>
-            <p className="text-white/50 text-sm mt-2 mb-6">Create your first goal and the AI will build a day-by-day roadmap.</p>
+            <h2 className="text-xl font-semibold">{t('goals.noGoalsFound') || 'No goals yet'}</h2>
+            <p className="text-white/50 text-sm mt-2 mb-6">{t('dashboard.noGoalsDesc') || 'Create your first goal and the AI will build a day-by-day roadmap.'}</p>
             <Link href="/dashboard" className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2">
-              Create a goal <ArrowRight size={16} />
+              {t('dashboard.createGoalBtn') || 'Create a goal'} <ArrowRight size={16} />
             </Link>
           </div>
         ) : (
@@ -100,7 +102,7 @@ export default function GoalsPage() {
                   <div className="mt-4">
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-white/40 flex items-center gap-1">
-                        <CalendarDays size={12} /> {goal.durationDays ? `${goal.durationDays} days` : goal.category}
+                        <CalendarDays size={12} /> {goal.durationDays ? `${goal.durationDays} ${t('roadmap.days') || 'days'}` : goal.category}
                       </span>
                       <span className="text-white/70 font-medium">{p.pct}%</span>
                     </div>

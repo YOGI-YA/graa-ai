@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useState } from 'react'
 import { GraduationCap, Loader2, CheckCircle2, XCircle, RotateCcw, Trophy } from 'lucide-react'
+import { useTranslation } from '@/lib/LanguageContext'
 
 interface QuizQuestion { question: string; options: string[] }
 interface QuestionResult { chosen: number; correct: boolean; answerIndex: number; explanation: string }
@@ -19,6 +20,7 @@ export default function QuizPanel({
   onPassed?: () => void
   lastAttempt?: { score: number; total: number; passed: boolean } | null
 }) {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>('intro')
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [answers, setAnswers] = useState<number[]>([])
@@ -70,8 +72,8 @@ export default function QuizPanel({
   return (
     <section className="glass rounded-2xl p-5 sm:p-6">
       <div className="flex items-center gap-2 text-sm font-semibold mb-4">
-        <GraduationCap size={16} className="text-purple-300" />
-        Knowledge check
+        <GraduationCap size={16} className="text-orange-400" />
+        {t('quiz.title')}
       </div>
 
       {error && <p className="text-red-300 text-xs mb-3">{error}</p>}
@@ -86,13 +88,13 @@ export default function QuizPanel({
               Last attempt: {lastAttempt.score}/{lastAttempt.total} ({Math.round((lastAttempt.score / lastAttempt.total) * 100)}%) — {lastAttempt.passed ? 'passed' : 'try again'}
             </div>
           )}
-          <p className="text-white/55 text-sm mb-4">Take a short quiz to lock in what you learned. Score 70% or higher to pass.</p>
+          <p className="text-white/55 text-sm mb-4">{t('quiz.subtitle')}</p>
           <button
             onClick={startQuiz}
             disabled={loading}
-            className="bg-purple-500 hover:bg-purple-400 disabled:opacity-60 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+            className="btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors inline-flex items-center gap-2"
           >
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Preparing quiz…</> : 'Start quiz'}
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Preparing quiz…</> : t('dayLearning.startQuiz')}
           </button>
         </div>
       )}
@@ -108,7 +110,7 @@ export default function QuizPanel({
                     key={oi}
                     className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
                       answers[qi] === oi
-                        ? 'border-purple-400/60 bg-purple-400/10 text-white'
+                        ? 'border-orange-400/60 bg-orange-400/10 text-white'
                         : 'border-white/8 hover:border-white/20 text-white/70'
                     }`}
                   >
@@ -117,7 +119,7 @@ export default function QuizPanel({
                       name={`q-${qi}`}
                       checked={answers[qi] === oi}
                       onChange={() => setAnswers(prev => prev.map((a, i) => (i === qi ? oi : a)))}
-                      className="accent-purple-400"
+                      className="accent-orange-400"
                     />
                     {opt}
                   </label>
@@ -128,9 +130,9 @@ export default function QuizPanel({
           <button
             onClick={submit}
             disabled={loading || !allAnswered}
-            className="bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors inline-flex items-center gap-2"
+            className="btn-primary disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors inline-flex items-center gap-2"
           >
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Grading…</> : allAnswered ? 'Submit answers' : 'Answer all questions'}
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Grading…</> : allAnswered ? t('quiz.submitQuiz') : 'Answer all questions'}
           </button>
         </div>
       )}
@@ -143,10 +145,10 @@ export default function QuizPanel({
             {result.passed ? <Trophy size={22} className="text-emerald-300" /> : <RotateCcw size={22} className="text-amber-300" />}
             <div>
               <div className="font-semibold text-sm">
-                {result.passed ? 'Passed!' : 'Almost there'} — {result.score}/{result.total} ({Math.round((result.score / result.total) * 100)}%)
+                {result.passed ? t('quiz.passedTitle') : t('quiz.failedTitle')} — {result.score}/{result.total} ({Math.round((result.score / result.total) * 100)}%)
               </div>
               <div className="text-white/50 text-xs mt-0.5">
-                {result.passed ? 'Practice for this day is unlocked below.' : `You need ${Math.round(result.passRatio * 100)}% to pass. Review and try again.`}
+                {result.passed ? t('quiz.passedMessage', { score: result.score, total: result.total }) : t('quiz.failedMessage', { score: result.score, total: result.total })}
               </div>
             </div>
           </div>
@@ -177,7 +179,7 @@ export default function QuizPanel({
             disabled={loading}
             className="bg-white/8 hover:bg-white/12 border border-white/10 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors inline-flex items-center gap-2"
           >
-            <RotateCcw size={15} /> Retake quiz
+            <RotateCcw size={15} /> {t('quiz.retakeQuiz')}
           </button>
         </div>
       )}

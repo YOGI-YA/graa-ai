@@ -4,6 +4,7 @@ import { Loader2, Wrench, ListChecks, Terminal } from 'lucide-react'
 import CodePlayground from '@/components/CodePlayground'
 import SubmissionPanel from '@/components/SubmissionPanel'
 import ReflectionPanel from '@/components/ReflectionPanel'
+import { useTranslation } from '@/lib/LanguageContext'
 
 type PracticeMode = 'code' | 'submit' | 'reflect'
 
@@ -31,6 +32,7 @@ export default function PracticeSandbox({
   day: number
   onSolved?: () => void
 }) {
+  const { t } = useTranslation()
   const [task, setTask] = useState<PracticeTask | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -63,13 +65,13 @@ export default function PracticeSandbox({
     <section className="glass rounded-2xl p-5 sm:p-6">
       <div className="flex items-center gap-2 text-sm font-semibold mb-4">
         <Wrench size={16} className="text-orange-400" />
-        Practice
+        {t('practice.title') || 'Practice'}
       </div>
 
       {loading && (
         <div className="text-center py-6">
           <Loader2 size={24} className="animate-spin text-orange-400 mx-auto mb-3" />
-          <p className="text-white/50 text-sm">Designing today&apos;s hands-on task…</p>
+          <p className="text-white/50 text-sm">{t('practice.designing') || "Designing today's hands-on task…"}</p>
         </div>
       )}
 
@@ -84,7 +86,9 @@ export default function PracticeSandbox({
 
           {task.steps.length > 0 && (
             <div>
-              <div className="flex items-center gap-2 eyebrow text-orange-400 mb-2"><Terminal size={14} /> Steps</div>
+              <div className="flex items-center gap-2 eyebrow text-orange-400 mb-2">
+                <Terminal size={14} /> {t('practice.steps') || 'Steps'}
+              </div>
               <ol className="space-y-1.5">
                 {task.steps.map((s, i) => (
                   <li key={i} className="text-white/60 text-sm flex gap-2">
@@ -105,7 +109,9 @@ export default function PracticeSandbox({
 
           {task.checklist.length > 0 && (
             <div className="bg-emerald-400/[0.05] border border-emerald-300/15 rounded-xl p-4">
-              <div className="flex items-center gap-2 eyebrow text-emerald-300 mb-2"><ListChecks size={14} /> Done when</div>
+              <div className="flex items-center gap-2 eyebrow text-emerald-300 mb-2">
+                <ListChecks size={14} /> {t('practice.doneWhen') || 'Done when'}
+              </div>
               <ul className="space-y-1.5">
                 {task.checklist.map((c, i) => (
                   <li key={i} className="text-white/60 text-sm flex gap-2"><span className="text-emerald-400 flex-shrink-0">✓</span>{c}</li>

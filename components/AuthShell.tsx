@@ -1,12 +1,9 @@
+'use client'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import Logo from '@/components/Logo'
-
-const BULLETS = [
-  'Day-by-day roadmaps for any goal',
-  'Curated lessons, quizzes & real practice',
-  'An AI mentor that knows your curriculum',
-]
+import LanguageSelector from '@/components/LanguageSelector'
+import { useTranslation } from '@/lib/LanguageContext'
 
 // Compact split-screen auth: tight form on the left, brand showcase on the right.
 export default function AuthShell({
@@ -18,11 +15,22 @@ export default function AuthShell({
   subtitle: string
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
+
+  const bullets = [
+    t('home.heroSubtitle') || 'Day-by-day roadmaps for any goal',
+    t('dayLearning.lessonSummary') || 'Curated lessons, quizzes & real practice',
+    t('chat.mentorTagline') || 'An AI mentor that knows your curriculum',
+  ]
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Form side */}
-      <div className="flex items-center justify-center px-5 py-10 sm:px-8">
-        <div className="w-full max-w-sm fade-up">
+      <div className="flex flex-col justify-center px-5 py-10 sm:px-8 relative">
+        <div className="absolute top-6 right-6 z-20">
+          <LanguageSelector variant="compact" />
+        </div>
+        <div className="w-full max-w-sm mx-auto fade-up">
           <Link href="/" className="inline-flex mb-8">
             <Logo size={32} />
           </Link>
@@ -42,7 +50,7 @@ export default function AuthShell({
             Learn anything,<br /><span className="text-orange-500">day by day</span>
           </h2>
           <ul className="mt-8 space-y-3.5">
-            {BULLETS.map(b => (
+            {bullets.map(b => (
               <li key={b} className="flex items-center gap-3 text-white/75 text-sm">
                 <span className="w-5 h-5 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0">
                   <Check size={12} className="text-orange-400" />

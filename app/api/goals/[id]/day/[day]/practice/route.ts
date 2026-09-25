@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const day = parseInt(dayStr, 10)
     if (!Number.isInteger(day) || day < 1) return NextResponse.json({ error: 'Invalid day' }, { status: 400 })
 
-    const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true, title: true, category: true } })
+    const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true, title: true, category: true, language: true } })
     if (!goal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Gate: require a passing quiz attempt for this day.
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const topic = dayTask?.title || `${goal.title} — day ${day}`
     const grounding = content ? buildGrounding(content.text, content.docs) : ''
 
-    const task = await generatePracticeTask(topic, dayTask?.description || '', goal.category, grounding, dayTask?.type)
+    const task = await generatePracticeTask(topic, dayTask?.description || '', goal.category, grounding, dayTask?.type, goal.language)
     const taskJson = task as unknown as Prisma.InputJsonValue
 
     await prisma.dayContent.upsert({
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { id, day: dayStr } = await params
     const day = parseInt(dayStr, 10)
-    const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true } })
+    const goal = await prisma.goal.findFirst({ where: { id, userId: session.user.id }, select: { id: true, language: true } })
     if (!goal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const body = await req.json()
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       { title: task.title, instructions: task.instructions, checklist: task.checklist },
       work,
       descriptor,
+      goal.language
     )
 
     if (result.passed) {

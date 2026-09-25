@@ -14,6 +14,7 @@ export async function GET() {
       email: true,
       image: true,
       learningStyle: true,
+      language: true,
       createdAt: true,
       _count: { select: { goals: true } },
     },
@@ -32,14 +33,15 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const data: { name?: string; learningStyle?: string | null } = {}
+  const data: { name?: string; learningStyle?: string | null; language?: string } = {}
   if (typeof body.name === 'string' && body.name.trim()) data.name = body.name.trim()
   if (typeof body.learningStyle === 'string') data.learningStyle = body.learningStyle || null
+  if (typeof body.language === 'string' && body.language.trim()) data.language = body.language.trim()
 
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data,
-    select: { name: true, email: true, learningStyle: true, image: true },
+    select: { name: true, email: true, learningStyle: true, language: true, image: true },
   })
 
   return NextResponse.json(user)

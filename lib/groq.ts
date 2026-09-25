@@ -1,6 +1,7 @@
 import axios from 'axios'
 import fs from 'fs'
 import path from 'path'
+import { getLanguage } from './languages'
 
 function ensureEnvLoaded() {
   for (const file of ['.env.local', '.env']) {
@@ -170,8 +171,15 @@ export function clampDuration(value: unknown): number | null {
 export interface RoadmapOptions {
   durationDays?: number | null
   skillLevel?: string | null
+  language?: string | null
   apiKey?: string
   model?: string
+}
+
+export function getLanguageInstruction(langCode?: string | null): string {
+  if (!langCode || langCode === 'en') return ''
+  const lang = getLanguage(langCode)
+  return `Target Language Requirement: Output all titles, descriptions, lesson text, explanations, instructions, and advice in ${lang.name} (${lang.nativeName} script). Keep code syntax, variable names, keywords, and technical terminology in standard format.`
 }
 
 function extractJson<T = any>(content: string): T {
@@ -275,8 +283,9 @@ export async function generateRoadmapDraft(
   learningStyle?: string,
   options: RoadmapOptions = {}
 ): Promise<RoadmapDraft> {
-  const { skillLevel, apiKey, model } = options
+  const { skillLevel, apiKey, model, language } = options
   const durationDays = clampDuration(options.durationDays)
+  const langInstruction = getLanguageInstruction(language)
 
   const durationLine = durationDays
     ? `Total duration: ${durationDays} days. Produce a day-by-day plan with ${durationDays} entries in "days" (day 1 through ${durationDays}), and set "durationDays" to ${durationDays}.`
@@ -288,6 +297,7 @@ export async function generateRoadmapDraft(
 User request: ${prompt}
 ${learningStyle ? `Learning style: ${learningStyle}` : ''}
 ${skillLevel ? `Skill level: ${skillLevel}` : ''}
+${langInstruction ? `${langInstruction}` : ''}
 ${durationLine}
 
 Existing roadmap:
@@ -299,6 +309,7 @@ Respond ONLY with a valid JSON object in the exact format below. Keep what still
 User goal: ${prompt}
 ${learningStyle ? `Learning style: ${learningStyle}` : ''}
 ${skillLevel ? `Skill level: ${skillLevel}` : ''}
+${langInstruction ? `${langInstruction}` : ''}
 ${durationLine}
 
 Respond ONLY with a valid JSON object in the exact format below. Infer a concise title, useful category, and realistic milestones.`
@@ -351,7 +362,7 @@ Generate exactly 4-6 milestones and 3-5 resources. The "days" array must cover t
 
  
   if (durationDays && (draft.days?.length ?? 0) < durationDays) {
-    draft.days = await fillMissingDays(draft, durationDays, { apiKey, model })
+    draft.days = await fillMissingDays(draft, durationDays, { apiKey, model, language })
   }
 
   return draft
@@ -362,14 +373,16 @@ async function generateDayRange(
   draft: RoadmapDraft,
   start: number,
   end: number,
-  opts: { apiKey?: string; model?: string }
+  opts: { apiKey?: string; model?: string; language?: string | null }
 ): Promise<DailyTaskItem[]> {
   const phases = draft.milestones.map((m, i) => `${i + 1}. ${m.title}`).join('\n')
+  const langInstruction = getLanguageInstruction(opts.language)
   const prompt = `Continue an existing day-by-day learning plan.
 
 Goal: ${draft.title}
 Outcome: ${draft.description}
 ${draft.skillLevel ? `Skill level: ${draft.skillLevel}` : ''}
+${langInstruction ? `${langInstruction}` : ''}
 Phases/milestones:
 ${phases}
 
@@ -400,7 +413,7 @@ Cover every day in the range, in order, progressing logically from the earlier p
 async function fillMissingDays(
   draft: RoadmapDraft,
   target: number,
-  opts: { apiKey?: string; model?: string }
+  opts: { apiKey?: string; model?: string; language?: string | null }
 ): Promise<DailyTaskItem[]> {
   const days = [...(draft.days ?? [])]
   let attempts = 0
@@ -457,7 +470,7 @@ export async function analyzeGoalAndGenerateMilestones(
   category: string,
   targetDate?: string,
   learningStyle?: string,
-  options: { durationDays?: number | null; skillLevel?: string | null } = {}
+  options: { durationDays?: number | null; skillLevel?: string | null; language?: string | null } = {}
 ): Promise<{ milestones: MilestoneItem[]; resources: ResourceItem[]; days: DailyTaskItem[]; advice: string }> {
   const prompt = [
     `Goal: ${goalTitle}`,
@@ -469,6 +482,7 @@ export async function analyzeGoalAndGenerateMilestones(
   const draft = await generateRoadmapDraft(prompt, undefined, learningStyle, {
     durationDays: options.durationDays ?? null,
     skillLevel: options.skillLevel ?? null,
+    language: options.language ?? null,
   })
 
   return {
@@ -490,8 +504,10 @@ export interface DayLesson {
 export async function generateDayLesson(
   topic: string,
   description: string,
-  snippets: { source: string; text: string }[] = []
+  snippets: { source: string; text: string }[] = [],
+  language?: string
 ): Promise<DayLesson> {
+  const langInstruction = getLanguageInstruction(language)
   const grounding = snippets.length
     ? `Use these source excerpts as your primary grounding (cite ideas, do not copy verbatim):\n\n${snippets
         .map((s, i) => `[Source ${i + 1} — ${s.source}]\n${s.text}`)
@@ -502,7 +518,7 @@ export async function generateDayLesson(
 
 Day topic: ${topic}
 Focus: ${description}
-
+${langInstruction ? `${langInstruction}\n` : ''}
 ${grounding}
 
 CRITICAL: Teach ONLY "${topic}". Stay strictly on this specific subtopic — do NOT teach the broader goal or unrelated technologies. If any source excerpt is off-topic, ignore it entirely.
@@ -550,13 +566,15 @@ export async function generateQuiz(
   topic: string,
   description: string,
   grounding: string,
-  count = 5
+  count = 5,
+  language?: string
 ): Promise<QuizQuestion[]> {
+  const langInstruction = getLanguageInstruction(language)
   const prompt = `You are a quiz writer. Create a ${count}-question multiple-choice quiz to test understanding of the day's material.
 
 Day topic: ${topic}
 Focus: ${description}
-
+${langInstruction ? `${langInstruction}\n` : ''}
 Material to base questions on:
 ${grounding || '(use accurate general knowledge of the topic)'}
 
@@ -619,15 +637,17 @@ export async function generatePracticeTask(
   description: string,
   category: string,
   grounding: string,
-  dayType?: string
+  dayType?: string,
+  preferredLanguage?: string
 ): Promise<PracticeTask> {
+  const langInstruction = getLanguageInstruction(preferredLanguage)
   const prompt = `You are designing the practice step for one day. Pick the RIGHT mode for the topic and the learner's field — don't force a build where it doesn't fit.
 
 Day topic: ${topic}
 Focus: ${description}
 Field / goal category: ${category}
 Day type: ${dayType || 'lesson'}
-
+${langInstruction ? `${langInstruction}\n` : ''}
 Material covered:
 ${grounding || '(use accurate general knowledge of the topic)'}
 
@@ -664,14 +684,14 @@ Keep it small (one session) and tied to today's topic. Code tasks must be runnab
     throw new Error('Failed to parse practice task response')
   }
 
-  const language = (p.language || 'none').toLowerCase().trim()
-  let mode: PracticeMode = p.mode === 'reflect' || p.mode === 'submit' || p.mode === 'code' ? p.mode : (RUNNABLE_LANGS.has(language) ? 'code' : 'submit')
-  if (mode === 'code' && !RUNNABLE_LANGS.has(language)) mode = 'submit'
+  const codeLang = (p.language || 'none').toLowerCase().trim()
+  let mode: PracticeMode = p.mode === 'reflect' || p.mode === 'submit' || p.mode === 'code' ? p.mode : (RUNNABLE_LANGS.has(codeLang) ? 'code' : 'submit')
+  if (mode === 'code' && !RUNNABLE_LANGS.has(codeLang)) mode = 'submit'
 
   return {
     mode,
     title: p.title || topic,
-    language,
+    language: codeLang,
     instructions: p.instructions || '',
     steps: Array.isArray(p.steps) ? p.steps.filter(Boolean) : [],
     starterCode: typeof p.starterCode === 'string' ? p.starterCode : '',
@@ -690,14 +710,16 @@ export interface SubmissionResult {
 export async function evaluateSubmission(
   task: { title: string; instructions: string; checklist?: string[] },
   work: string,
-  descriptor: string 
+  descriptor: string,
+  language?: string
 ): Promise<SubmissionResult> {
+  const langInstruction = getLanguageInstruction(language)
   const prompt = `You are a strict-but-fair mentor grading a practice submission. Judge it on merit for the learner's field — do not require code if the task isn't a coding task.
 
 Task: ${task.title}
 Instructions: ${task.instructions}
 ${task.checklist?.length ? `Done when:\n- ${task.checklist.join('\n- ')}` : ''}
-
+${langInstruction ? `${langInstruction}\n` : ''}
 Submission type: ${descriptor}
 Submission:
 """
@@ -747,9 +769,13 @@ Be specific, warm, and action-oriented. No fluff.`
 export async function streamChatWithMentor(
   messages: { role: 'user' | 'assistant'; content: string }[],
   goalContext?: string,
-  options: { apiKey?: string; model?: string } = {}
+  options: { apiKey?: string; model?: string; language?: string } = {}
 ): Promise<ReadableStream<Uint8Array>> {
   const keys = options.apiKey ? [options.apiKey] : groqKeys()
+  const langObj = getLanguage(options.language)
+  const languageClause = options.language && options.language !== 'en'
+    ? `\n\nLANGUAGE INSTRUCTION: You must respond fluently and naturally in ${langObj.name} (${langObj.nativeName} script). Keep code examples, technical terms, and syntax accurate.`
+    : ''
 
   const systemPrompt = `You are Graa, an advanced AI learning mentor and assistant inside Graa AI.
 
@@ -764,7 +790,7 @@ IDENTITY & PRIVACY RULES:
 7. Provide specific, actionable advice and break complex topics into clear steps.
 8. Keep users motivated and adapt explanations to their learning level.
 
-Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext ? `\n\nCurrent context for this learner:\n${goalContext}` : ''}`
+Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext ? `\n\nCurrent context for this learner:\n${goalContext}` : ''}${languageClause}`
 
   const body = (model: string) => JSON.stringify({
     model,
@@ -852,8 +878,14 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
 
 export async function chatWithMentor(
   messages: { role: 'user' | 'assistant'; content: string }[],
-  goalContext?: string
+  goalContext?: string,
+  language?: string
 ): Promise<string> {
+  const langObj = getLanguage(language)
+  const languageClause = language && language !== 'en'
+    ? `\n\nLANGUAGE INSTRUCTION: You must respond fluently and naturally in ${langObj.name} (${langObj.nativeName} script). Keep code examples, technical terms, and syntax accurate.`
+    : ''
+
   const systemPrompt = `You are Graa, an advanced AI learning mentor and assistant inside Graa AI.
 
 IDENTITY & PRIVACY RULES:
@@ -867,7 +899,7 @@ IDENTITY & PRIVACY RULES:
 7. Provide specific, actionable advice and break complex topics into clear steps.
 8. Keep users motivated and adapt explanations to their learning level.
 
-Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext ? `\n\nCurrent context for this learner:\n${goalContext}` : ''}`
+Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext ? `\n\nCurrent context for this learner:\n${goalContext}` : ''}${languageClause}`
 
   const content = await createChatCompletion(
     [

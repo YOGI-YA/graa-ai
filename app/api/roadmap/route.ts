@@ -22,16 +22,18 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { prompt, roadmap, durationDays, skillLevel, model } = await req.json()
+    const { prompt, roadmap, durationDays, skillLevel, model, language } = await req.json()
     if (typeof prompt !== 'string' || !prompt.trim()) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
     const learningStyle = await getLearningStyle(session.user.id)
+    const targetLanguage = language || req.cookies.get('graa_lang')?.value || session.user.language || 'en'
     const draft = await generateRoadmapDraft(prompt.trim(), roadmap, learningStyle, {
       durationDays: Number.isFinite(durationDays) ? Number(durationDays) : null,
       skillLevel: typeof skillLevel === 'string' ? skillLevel : null,
       model: typeof model === 'string' ? model : undefined,
+      language: targetLanguage,
     })
 
     return NextResponse.json({ roadmap: draft })

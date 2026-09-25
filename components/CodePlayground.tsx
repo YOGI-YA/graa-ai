@@ -2,6 +2,7 @@
 import { useCallback, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { Play, Loader2, Lightbulb, Send, CheckCircle2, RotateCcw, Terminal } from 'lucide-react'
+import { useTranslation } from '@/lib/LanguageContext'
 
 interface Lang { id: string; label: string; monaco: string; piston: string }
 
@@ -35,6 +36,7 @@ export default function CodePlayground({
   task: { title: string; language: string; starterCode: string; hints: string[] }
   onSolved?: () => void
 }) {
+  const { t } = useTranslation()
   const [lang, setLang] = useState<Lang>(() => resolveLang(task.language))
   const [code, setCode] = useState(task.starterCode || '')
   const [output, setOutput] = useState<string | null>(null)
@@ -98,7 +100,7 @@ export default function CodePlayground({
           className="btn-primary px-4 py-1.5 text-xs flex items-center gap-1.5"
         >
           {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-          Run
+          {running ? t('playground.running') : t('playground.runCode')}
         </button>
         <button
           onClick={() => setCode(task.starterCode || '')}
@@ -133,7 +135,7 @@ export default function CodePlayground({
       {output !== null && (
         <div className="rounded-xl border border-white/10 bg-black/50 overflow-hidden">
           <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-white/8 text-[11px] text-white/40">
-            <Terminal size={12} /> Output
+            <Terminal size={12} /> {t('playground.consoleOutput')}
           </div>
           <pre className="p-3 text-[12px] mono text-white/80 whitespace-pre-wrap max-h-56 overflow-auto">{output}</pre>
         </div>
@@ -143,10 +145,10 @@ export default function CodePlayground({
       {task.hints.length > 0 && (
         <div className="rounded-xl border border-white/8 bg-amber-400/[0.04] p-3">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300"><Lightbulb size={14} /> Hints</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-300"><Lightbulb size={14} /> {t('playground.hints')}</span>
             {hintsShown < task.hints.length && (
               <button onClick={() => setHintsShown(n => n + 1)} className="text-xs text-amber-300/80 hover:text-amber-200">
-                {hintsShown === 0 ? 'Show a hint' : 'Next hint'} ({hintsShown}/{task.hints.length})
+                {hintsShown === 0 ? t('playground.revealHint', { number: 1 }) : `Next hint (${hintsShown}/${task.hints.length})`}
               </button>
             )}
           </div>
@@ -166,7 +168,7 @@ export default function CodePlayground({
       <div className="flex items-center gap-3">
         <button onClick={submit} disabled={submitting} className="btn-primary px-5 py-2.5 text-sm flex items-center gap-2">
           {submitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-          Submit for review
+          {submitting ? t('playground.submitting') : t('playground.submit')}
         </button>
         {result && (
           <span className={`text-sm flex items-center gap-1.5 ${result.passed ? 'text-emerald-300' : 'text-amber-300'}`}>

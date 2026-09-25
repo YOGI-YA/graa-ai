@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import AuthShell from '@/components/AuthShell'
 import GoogleButton from '@/components/GoogleButton'
+import { useTranslation } from '@/lib/LanguageContext'
 
 const LEARNING_STYLES = [
   { value: 'visual', label: 'Visual' },
@@ -14,6 +15,7 @@ const LEARNING_STYLES = [
 ]
 
 export default function RegisterPage() {
+  const { t, language } = useTranslation()
   const [form, setForm] = useState({ name: '', email: '', password: '', learningStyle: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,7 +28,7 @@ export default function RegisterPage() {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, language }),
     })
     const data = await res.json()
     if (res.ok) {
@@ -38,8 +40,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title="Create account" subtitle="Start achieving your learning goals today.">
-      <GoogleButton label="Sign up with Google" />
+    <AuthShell
+      title={t('auth.registerTitle') || "Create account"}
+      subtitle={t('auth.registerSubtitle') || "Start achieving your learning goals today."}
+    >
+      <GoogleButton label={t('auth.signUpBtn') || "Sign up with Google"} />
       <div className="flex items-center gap-3 my-4">
         <div className="h-px flex-1 bg-white/10" />
         <span className="eyebrow text-white/30">or</span>
@@ -50,7 +55,7 @@ export default function RegisterPage() {
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           className="field px-4 py-2.5 text-sm"
-          placeholder="Full name"
+          placeholder={t('auth.name') || "Full name"}
           required
         />
         <input
@@ -58,7 +63,7 @@ export default function RegisterPage() {
           value={form.email}
           onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
           className="field px-4 py-2.5 text-sm"
-          placeholder="Email address"
+          placeholder={t('auth.email') || "Email address"}
           required
         />
         <input
@@ -66,7 +71,7 @@ export default function RegisterPage() {
           value={form.password}
           onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
           className="field px-4 py-2.5 text-sm"
-          placeholder="Password · min. 8 characters"
+          placeholder={t('auth.password') || "Password · min. 8 characters"}
           minLength={8}
           required
         />
@@ -91,12 +96,12 @@ export default function RegisterPage() {
         </div>
         {error && <p className="text-rose-300 text-xs bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">{error}</p>}
         <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-sm">
-          {loading ? <><Loader2 size={15} className="animate-spin" /> Creating account…</> : 'Create account'}
+          {loading ? <><Loader2 size={15} className="animate-spin" /> {t('common.loading') || 'Creating account…'}</> : (t('auth.signUpBtn') || 'Create account')}
         </button>
       </form>
       <p className="text-center text-white/45 text-sm mt-6">
-        Already have an account?{' '}
-        <Link href="/login" className="text-orange-400 hover:text-orange-300 font-semibold">Sign in</Link>
+        {t('auth.haveAccount') || "Already have an account?"}{' '}
+        <Link href="/login" className="text-orange-400 hover:text-orange-300 font-semibold">{t('auth.signInLink') || "Sign in"}</Link>
       </p>
     </AuthShell>
   )

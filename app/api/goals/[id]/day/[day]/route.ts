@@ -13,7 +13,7 @@ export const maxDuration = 60
 async function getOwnedTask(goalId: string, day: number, userId: string) {
   const goal = await prisma.goal.findFirst({
     where: { id: goalId, userId },
-    select: { id: true, title: true, category: true },
+    select: { id: true, title: true, category: true, language: true },
   })
   if (!goal) return null
   const task = await prisma.task.findFirst({ where: { goalId, day } })
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Search the SPECIFIC day topic; pass the category only as a light disambiguator.
     const sources = await gatherSources(topic, goal.category)
-    const lesson = await generateDayLesson(topic, description, sources.snippets)
+    const lesson = await generateDayLesson(topic, description, sources.snippets, goal.language)
 
     const content = {
       video: sources.video ?? undefined,

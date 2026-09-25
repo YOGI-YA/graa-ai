@@ -55,13 +55,22 @@ export const authOptions: NextAuthOptions = {
       }
       // Google sign-in: resolve our DB id from the email.
       if (account?.provider === 'google' && token.email) {
-        const dbUser = await prisma.user.findUnique({ where: { email: token.email }, select: { id: true } })
-        if (dbUser) token.id = dbUser.id
+        const dbUser = await prisma.user.findUnique({ where: { email: token.email }, select: { id: true, language: true } })
+        if (dbUser) {
+          token.id = dbUser.id
+          token.language = dbUser.language
+        }
+      } else if (token.id && !token.language) {
+        const dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { language: true } })
+        if (dbUser) token.language = dbUser.language
       }
       return token
     },
     async session({ session, token }) {
-      if (session.user) session.user.id = token.id as string
+      if (session.user) {
+        session.user.id = token.id as string
+        session.user.language = (token.language as string) || 'en'
+      }
       return session
     },
   },

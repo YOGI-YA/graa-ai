@@ -11,7 +11,7 @@ export const maxDuration = 60
 const PASS_RATIO = 0.7
 
 async function ownedGoal(goalId: string, userId: string) {
-  return prisma.goal.findFirst({ where: { id: goalId, userId }, select: { id: true, title: true, category: true } })
+  return prisma.goal.findFirst({ where: { id: goalId, userId }, select: { id: true, title: true, category: true, language: true } })
 }
 
 interface LessonShape {
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ])
       const topic = task?.title || `${goal.title} — day ${day}`
       const grounding = content ? buildGrounding(content.text, content.docs) : ''
-      const questions = await generateQuiz(topic, task?.description || '', grounding)
+      const questions = await generateQuiz(topic, task?.description || '', grounding, 5, goal.language)
       if (questions.length === 0) return NextResponse.json({ error: 'Could not generate a quiz' }, { status: 502 })
 
       quiz = await prisma.quiz.create({

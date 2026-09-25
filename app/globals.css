@@ -54,7 +54,7 @@ html { scrollbar-gutter: stable; }
 body {
   background: var(--bg);
   color: var(--foreground);
-  font-family: var(--font-inter, 'Inter'), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter, 'Inter'), 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Bengali', 'Noto Sans Gujarati', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', 'Noto Sans Arabic', 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.012em;
