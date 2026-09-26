@@ -225,24 +225,30 @@ export async function searchYouTube(
   const { goalTitle = '', category = '', description = '', language = 'en' } = context
   const lang = getLanguage(language)
 
-  // 1. Build targeted search queries to capture both high-precision localized and technical results
+  // 1. Build targeted search queries to capture high-precision global and localized results
   const queries: string[] = []
-  
-  if (goalTitle && goalTitle.trim() && !topic.toLowerCase().includes(goalTitle.toLowerCase())) {
-    queries.push(`${goalTitle} ${topic} tutorial`)
+  const isRegional = language && language !== 'en'
+
+  if (isRegional) {
+    // Highly targeted regional language queries
+    queries.push(`${topic} in ${lang.name} tutorial`)
+    if (goalTitle && goalTitle.trim()) {
+      queries.push(`${goalTitle} ${topic} in ${lang.name}`)
+    }
+    queries.push(`${topic} ${lang.name} full course`)
+    if (lang.nativeName && lang.nativeName !== lang.name) {
+      queries.push(`${topic} ${lang.nativeName}`)
+    }
   } else {
-    queries.push(`${topic} ${category || 'tutorial'}`.trim())
+    // Highly authoritative English / Global queries
+    if (goalTitle && goalTitle.trim() && !topic.toLowerCase().includes(goalTitle.toLowerCase())) {
+      queries.push(`${goalTitle} ${topic} tutorial`)
+    }
+    queries.push(`${topic} ${category || ''} full tutorial`.trim())
+    queries.push(`${topic} complete course masterclass`)
   }
 
-  if (language && language !== 'en') {
-    queries.push(`${topic} ${goalTitle || ''} tutorial in ${lang.name}`.trim())
-  }
-
-  if (category && !queries[0].toLowerCase().includes(category.toLowerCase())) {
-    queries.push(`${topic} ${category} tutorial`)
-  }
-
-  logger.info('SCRAPE_YT', 'Searching YouTube with contextual queries', { queries, context })
+  logger.info('SCRAPE_YT', 'Searching YouTube with contextual queries', { queries, language, context })
 
   // 2. Fetch candidates from queries in parallel
   const candidateLists = await Promise.all(queries.map(q => fetchYouTubeCandidates(q, 8)))

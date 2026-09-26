@@ -9,6 +9,7 @@ import QuizPanel from '@/components/QuizPanel'
 import PracticeSandbox from '@/components/PracticeSandbox'
 import { notify } from '@/components/Toast'
 import { useTranslation } from '@/lib/LanguageContext'
+import { INDIAN_LANGUAGES, getLanguage } from '@/lib/languages'
 
 interface TaskInfo {
   day: number
@@ -72,6 +73,11 @@ export default function DayLearning({
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(task?.completed ?? false)
   const [quizPassed, setQuizPassed] = useState(initialQuizPassed)
+  const [videoLanguage, setVideoLanguage] = useState<string>(
+    language && language !== 'en' ? language : 'hi'
+  )
+  const [fetchingLanguageVideo, setFetchingLanguageVideo] = useState(false)
+  const [refreshingVideo, setRefreshingVideo] = useState(false)
   const [selectedVideoType, setSelectedVideoType] = useState<'global' | 'localized'>(
     language && language !== 'en' ? 'localized' : 'global'
   )
@@ -129,17 +135,45 @@ export default function DayLearning({
     }
   }, [goalId, day])
 
-  const [refreshingVideo, setRefreshingVideo] = useState(false)
+  const handleFetchLanguageVideo = useCallback(async (targetLang: string) => {
+    setVideoLanguage(targetLang)
+    setSelectedVideoType('localized')
+    setFetchingLanguageVideo(true)
+    try {
+      const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: targetLang, type: 'localized' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch video')
+      setContent(prev => prev ? { ...prev, video: data.video } : null)
+      const langInfo = getLanguage(targetLang)
+      if (data.video?.localized) {
+        notify(`Loaded verified ${langInfo.name} tutorial`, 'success')
+      } else {
+        notify(`No verified ${langInfo.name} video found, fallback applied`, 'info')
+      }
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Could not fetch language video', 'error')
+    } finally {
+      setFetchingLanguageVideo(false)
+    }
+  }, [goalId, day])
 
   const handleReverifyVideo = useCallback(async () => {
     setRefreshingVideo(true)
     try {
-      const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, { method: 'POST' })
+      const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: videoLanguage, type: 'both' }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to re-verify video')
       setContent(prev => prev ? { ...prev, video: data.video } : null)
       if (data.video) {
-        notify('Video verified and updated', 'success')
+        notify('Verified English and regional tutorials with AI', 'success')
       } else {
         notify('No verified tutorial video found for this specific subtopic', 'info')
       }
@@ -148,7 +182,7 @@ export default function DayLearning({
     } finally {
       setRefreshingVideo(false)
     }
-  }, [goalId, day])
+  }, [goalId, day, videoLanguage])
 
   // Passing the quiz only UNLOCKS practice — the day completes when the practice
   // task is submitted and passes (the practice API marks it complete server-side),
@@ -212,54 +246,73 @@ export default function DayLearning({
 
         {!loading && !error && content && (
           <div className="space-y-6 fade-up">
-            {/* Dual Video Player (Global Best vs Language-Specific) */}
+            {/* Dual Video Player (Best English Masterclass vs Language-Specific Track) */}
             {(() => {
               const vidData = content.video
               const globalVid = vidData?.global || (vidData && (!vidData.localized || vidData.videoId === vidData.global?.videoId) ? vidData : null)
               const localizedVid = vidData?.localized || null
               const activeVideo = (selectedVideoType === 'localized' && localizedVid) ? localizedVid : (globalVid || localizedVid || vidData)
+              const currentLangInfo = getLanguage(videoLanguage)
 
               if (!vidData && !globalVid && !localizedVid) {
                 return (
-                  <section className="glass rounded-2xl p-5 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <PlayCircle size={20} className="text-white/30" />
-                      <div>
-                        <div className="text-sm font-medium text-white/80">No verified video tutorial attached</div>
-                        <div className="text-xs text-white/40">You can have AI search and verify global and language-specific tutorials.</div>
+                  <section className="glass rounded-2xl p-6 border border-white/10">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
+                          <PlayCircle size={22} />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-white/90">Video Tutorials for this topic</div>
+                          <div className="text-xs text-white/50 mt-0.5">Fetch the best authoritative English masterclass and native language tutorials.</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <select
+                          value={videoLanguage}
+                          onChange={(e) => setVideoLanguage(e.target.value)}
+                          className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:outline-none"
+                        >
+                          {INDIAN_LANGUAGES.map((lang) => (
+                            <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                              {lang.nativeName} ({lang.name})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handleReverifyVideo()}
+                          disabled={refreshingVideo}
+                          className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 flex-shrink-0"
+                        >
+                          <Sparkles size={13} />
+                          {refreshingVideo ? 'Verifying with AI...' : 'Find Dual Videos'}
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleReverifyVideo()}
-                      disabled={refreshingVideo}
-                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 flex items-center gap-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
-                    >
-                      <Sparkles size={13} className="text-orange-300" />
-                      {refreshingVideo ? 'Finding...' : 'Find Dual Videos with AI'}
-                    </button>
                   </section>
                 )
               }
 
               return (
                 <section className="glass rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                  {/* Top Bar with Dual Switcher */}
-                  <div className="p-4 sm:p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
+                  {/* Top Bar with Dual Switcher & Language Picker */}
+                  <div className="p-4 sm:p-5 border-b border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/[0.02]">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
                         <PlayCircle size={16} className="text-red-400" />
-                        {t('dayLearning.watchTutorial') || 'Video Tutorials'}
+                        <span>Curated Video Tutorials</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/20 font-normal">
                           Dual Track
                         </span>
                       </div>
                       <p className="text-[11px] text-white/40 mt-0.5">
-                        Choose between top global masterclass or language-specific tutorial
+                        High-accuracy English masterclass + dedicated {currentLangInfo.name} tutorial
                       </p>
                     </div>
 
-                    {/* Switcher & Re-verify Controls */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    {/* Switcher & Language Controls */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      {/* Track Switcher */}
                       <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10">
                         <button
                           onClick={() => setSelectedVideoType('global')}
@@ -270,13 +323,17 @@ export default function DayLearning({
                           }`}
                         >
                           <span>🌐</span>
-                          <span>Global Best</span>
-                          {globalVid && <span className="text-[10px] opacity-75">({globalVid.channel || 'English'})</span>}
+                          <span>Best English Video</span>
                         </button>
 
                         <button
-                          onClick={() => setSelectedVideoType('localized')}
-                          disabled={!localizedVid && refreshingVideo}
+                          onClick={() => {
+                            setSelectedVideoType('localized')
+                            if (!localizedVid) {
+                              handleFetchLanguageVideo(videoLanguage)
+                            }
+                          }}
+                          disabled={fetchingLanguageVideo}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
                             selectedVideoType === 'localized' && localizedVid
                               ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20'
@@ -284,28 +341,52 @@ export default function DayLearning({
                           }`}
                         >
                           <span>🗣️</span>
-                          <span>Language Track</span>
-                          {localizedVid ? (
-                            <span className="text-[10px] opacity-75">({localizedVid.channel || 'Native'})</span>
-                          ) : (
-                            <span className="text-[10px] text-white/30">(Fetch)</span>
+                          <span>{currentLangInfo.name} Video</span>
+                          {!localizedVid && !fetchingLanguageVideo && (
+                            <span className="text-[10px] text-cyan-300/70 font-normal">(Get)</span>
                           )}
                         </button>
                       </div>
 
+                      {/* Language Picker Dropdown */}
+                      <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5">
+                        <span className="text-[11px] text-white/40">Language:</span>
+                        <select
+                          value={videoLanguage}
+                          onChange={(e) => handleFetchLanguageVideo(e.target.value)}
+                          disabled={fetchingLanguageVideo || refreshingVideo}
+                          className="bg-transparent text-xs text-white/90 font-medium focus:outline-none cursor-pointer"
+                        >
+                          {INDIAN_LANGUAGES.map((lang) => (
+                            <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                              {lang.nativeName} ({lang.name})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* AI Re-verify Button */}
                       <button
                         onClick={() => handleReverifyVideo()}
-                        disabled={refreshingVideo}
-                        title="Re-verify or fetch updated video recommendations"
+                        disabled={refreshingVideo || fetchingLanguageVideo}
+                        title="Re-verify or refresh videos with AI"
                         className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-orange-300 transition-colors disabled:opacity-50"
                       >
-                        <RefreshCw size={13} className={refreshingVideo ? 'animate-spin' : ''} />
+                        <RefreshCw size={13} className={refreshingVideo || fetchingLanguageVideo ? 'animate-spin' : ''} />
                       </button>
                     </div>
                   </div>
 
-                  {/* Active Video Player */}
-                  {activeVideo?.videoId ? (
+                  {/* Player Area */}
+                  {fetchingLanguageVideo ? (
+                    <div className="p-12 text-center bg-black/40 flex flex-col items-center justify-center gap-3">
+                      <Loader2 size={28} className="animate-spin text-cyan-400" />
+                      <div className="text-sm text-white/80 font-medium">
+                        Searching and AI-verifying the top tutorial in {currentLangInfo.name} ({currentLangInfo.nativeName})...
+                      </div>
+                      <div className="text-xs text-white/40">Ensuring high pedagogical accuracy and zero off-topic clutter.</div>
+                    </div>
+                  ) : activeVideo?.videoId ? (
                     <div>
                       <div className="relative w-full bg-black/60" style={{ aspectRatio: '16 / 9' }}>
                         <iframe
@@ -319,12 +400,14 @@ export default function DayLearning({
                       </div>
                       <div className="px-5 py-3 text-xs bg-black/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/5">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${
                             selectedVideoType === 'localized' && localizedVid
                               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                               : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
                           }`}>
-                            {selectedVideoType === 'localized' && localizedVid ? 'Language Edition' : 'Global Masterclass'}
+                            {selectedVideoType === 'localized' && localizedVid
+                              ? `${currentLangInfo.name} Edition`
+                              : 'Global English Masterclass'}
                           </span>
                           <span className="truncate text-white/70 font-medium">
                             {activeVideo.title}
@@ -343,14 +426,16 @@ export default function DayLearning({
                     </div>
                   ) : (
                     <div className="p-8 text-center bg-white/[0.01]">
-                      <p className="text-sm text-white/60 mb-3">No video found for this specific option yet.</p>
+                      <p className="text-sm text-white/60 mb-3">
+                        No video found for {currentLangInfo.name} yet. Click below to fetch with AI:
+                      </p>
                       <button
-                        onClick={() => handleReverifyVideo()}
-                        disabled={refreshingVideo}
+                        onClick={() => handleFetchLanguageVideo(videoLanguage)}
+                        disabled={fetchingLanguageVideo}
                         className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5"
                       >
                         <Sparkles size={13} />
-                        {refreshingVideo ? 'Searching...' : 'Search YouTube with AI'}
+                        Fetch {currentLangInfo.name} Video
                       </button>
                     </div>
                   )}
