@@ -64,8 +64,8 @@ def extract_units_and_topics(text: str) -> List[Dict[str, Any]]:
     
     return units
 
-@app.get("/")
-@app.get("/health")
+@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
     return {
         "status": "online",
