@@ -3,9 +3,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Loader2, Flame, ArrowRight, PlayCircle, BookOpen } from 'lucide-react'
+import { Plus, Loader2, Flame, ArrowRight, PlayCircle, BookOpen, UploadCloud, BarChart3 } from 'lucide-react'
 import GoalCard from '@/components/GoalCard'
 import NewGoalModal from '@/components/NewGoalModal'
+import CurriculumUploadModal from '@/components/CurriculumUploadModal'
 import EmptyRoadmapBuilder from '@/components/EmptyRoadmapBuilder'
 import AppNav from '@/components/AppNav'
 import type { Goal, Milestone } from '@/types/goal'
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewGoal, setShowNewGoal] = useState(false)
+  const [showCurriculumModal, setShowCurriculumModal] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -144,9 +146,17 @@ export default function Dashboard() {
                     {resume.next ? `${t('dashboard.resumeDay')} ${resume.next.day}` : 'Review roadmap'}
                     <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                   </Link>
-                  <Link href={`/goals/${resume.goal.id}`} className="btn-ghost px-6 py-3 text-sm flex items-center justify-center gap-2">
-                    <BookOpen size={16} /> {t('goals.viewRoadmap')}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/goals/${resume.goal.id}`} className="btn-ghost px-4 py-3 text-sm flex items-center justify-center gap-2 flex-1">
+                      <BookOpen size={16} /> {t('goals.viewRoadmap')}
+                    </Link>
+                    <Link
+                      href={`/goals/${resume.goal.id}/evaluation`}
+                      className="px-4 py-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-sm flex items-center justify-center gap-2 transition-all"
+                    >
+                      <BarChart3 size={16} /> Analytics
+                    </Link>
+                  </div>
                 </div>
               </div>
             </section>
@@ -167,14 +177,22 @@ export default function Dashboard() {
           </div>
 
           {/* Goals */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="display text-xl sm:text-2xl">{t('goals.title')}</h2>
               <p className="text-white/40 text-sm mt-1">{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {stats.completedGoals} completed</p>
             </div>
-            <button onClick={openNewGoal} className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
-              <Plus size={16} /> {t('goals.newGoal')}
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => setShowCurriculumModal(true)}
+                className="px-4 py-2 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-xs sm:text-sm font-medium flex items-center gap-2 transition-all shadow-md"
+              >
+                <UploadCloud size={16} /> Upload Curriculum
+              </button>
+              <button onClick={openNewGoal} className="btn-primary px-4 py-2 text-xs sm:text-sm flex items-center gap-2">
+                <Plus size={16} /> {t('goals.newGoal')}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 stagger">
@@ -186,6 +204,12 @@ export default function Dashboard() {
       )}
 
       {showNewGoal && <NewGoalModal onClose={closeNewGoal} onCreated={handleGoalCreated} />}
+      {showCurriculumModal && (
+        <CurriculumUploadModal
+          onClose={() => setShowCurriculumModal(false)}
+          onCreated={handleGoalCreated}
+        />
+      )}
     </div>
   )
 }

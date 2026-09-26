@@ -1,15 +1,17 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Loader2, Brain, Sparkles, Globe } from 'lucide-react'
+import { X, Loader2, Brain, Sparkles, Globe, UploadCloud } from 'lucide-react'
 import type { Goal } from '@/types/goal'
 import { useTranslation } from '@/lib/LanguageContext'
 import { INDIAN_LANGUAGES } from '@/lib/languages'
+import CurriculumUploadModal from '@/components/CurriculumUploadModal'
 
 const CATEGORIES = ['Programming', 'Data Science', 'Design', 'Language', 'Business', 'Mathematics', 'Science', 'Arts', 'Health', 'Other']
 const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced']
 
 export default function NewGoalModal({ onClose, onCreated }: { onClose: () => void; onCreated: (goal: Goal) => void }) {
   const { t, language } = useTranslation()
+  const [showCurriculumUpload, setShowCurriculumUpload] = useState(false)
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -27,6 +29,10 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
   useEffect(() => () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
   }, [])
+
+  if (showCurriculumUpload) {
+    return <CurriculumUploadModal onClose={onClose} onCreated={onCreated} />
+  }
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,9 +72,19 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
               <p className="text-white/40 text-xs">{t('goalModal.subtitle')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCurriculumUpload(true)}
+              className="text-xs px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 flex items-center gap-1.5 transition-all"
+            >
+              <UploadCloud size={13} />
+              Upload Syllabus
+            </button>
+            <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {advice ? (

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma, ensureDatabaseSchema } from '@/lib/prisma'
-import { searchYouTube } from '@/lib/scrape'
+import { searchDualYouTube } from '@/lib/scrape'
 import { logger } from '@/lib/logger'
 
 export const runtime = 'nodejs'
@@ -30,17 +30,28 @@ export async function POST(
     })
     if (!goal) return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
 
+    let reqLang: string | undefined
+    try {
+      const body = await req.json()
+      if (body?.language && typeof body.language === 'string') {
+        reqLang = body.language
+      }
+    } catch {
+      // no json body
+    }
+
     const task = await prisma.task.findFirst({ where: { goalId: id, day } })
     const topic = task?.title || `${goal.title} — day ${day}`
     const description = task?.description || ''
+    const effectiveLanguage = reqLang || goal.language || 'en'
 
-    logger.info('VIDEO_REVERIFY', 'Re-verifying video with AI', { goalId: id, day, topic })
+    logger.info('VIDEO_REVERIFY', 'Re-verifying dual video with AI', { goalId: id, day, topic, language: effectiveLanguage })
 
-    const video = await searchYouTube(topic, {
+    const video = await searchDualYouTube(topic, {
       goalTitle: goal.title,
       category: goal.category,
       description,
-      language: goal.language,
+      language: effectiveLanguage,
     })
 
     const videoJson: Prisma.InputJsonValue | typeof Prisma.JsonNull = video

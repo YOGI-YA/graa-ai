@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useCallback, useMemo, useState } from 'react'
-import { ArrowLeft, CheckCircle2, ChevronLeft, Circle, Lock, Play, Sparkles, Trophy } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronLeft, Circle, Lock, Play, Sparkles, Trophy, BarChart3 } from 'lucide-react'
 import type { Goal, Milestone } from '@/types/goal'
 import AppNav from '@/components/AppNav'
 import { useTranslation } from '@/lib/LanguageContext'
@@ -124,7 +124,15 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
             <ArrowLeft size={16} />
             {t('nav.dashboard') || 'Dashboard'}
           </Link>
-          <div className="text-xs text-white/35">{goal.category}</div>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/goals/${goal.id}/evaluation`}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-medium flex items-center gap-1.5 transition-all shadow-md"
+            >
+              <BarChart3 size={14} /> Evaluation & Analytics
+            </Link>
+            <div className="text-xs text-white/35">{goal.category}</div>
+          </div>
         </div>
 
         <section className={`transition-all duration-700 ${selectedMilestone ? 'opacity-0 scale-95 pointer-events-none absolute inset-x-4 sm:inset-x-8 top-20' : 'opacity-100 scale-100'}`}>
@@ -145,13 +153,22 @@ export default function RoadmapGraph({ initialGoal }: { initialGoal: Goal }) {
                 <div className="h-2 bg-white/8 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-cyan-400 via-indigo-400 to-violet-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                 </div>
-                <Link
-                  href={`/goals/${goal.id}/day/${nextTask ? nextTask.day : tasks[0].day}`}
-                  className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2 mt-4"
-                >
-                  <Play size={15} />
-                  {nextTask ? (t('roadmap.continueDay', { day: nextTask.day }) || `Continue · Day ${nextTask.day}`) : (t('roadmap.reviewFromDay1') || 'Review from Day 1')}
-                </Link>
+                <div className="flex items-center gap-3 mt-4">
+                  <Link
+                    href={`/goals/${goal.id}/day/${nextTask ? nextTask.day : tasks[0].day}`}
+                    className="btn-primary px-5 py-2.5 text-sm inline-flex items-center gap-2"
+                  >
+                    <Play size={15} />
+                    {nextTask ? (t('roadmap.continueDay', { day: nextTask.day }) || `Continue · Day ${nextTask.day}`) : (t('roadmap.reviewFromDay1') || 'Review from Day 1')}
+                  </Link>
+                  <Link
+                    href={`/goals/${goal.id}/evaluation`}
+                    className="btn-ghost px-4 py-2.5 text-sm inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200"
+                  >
+                    <BarChart3 size={15} />
+                    Track Evaluation
+                  </Link>
+                </div>
               </div>
             )}
           </div>

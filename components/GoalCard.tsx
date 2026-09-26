@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { memo, useCallback, useMemo, useState } from 'react'
-import { Target, ChevronDown, ChevronUp, CheckCircle, Circle, Clock, BookOpen, Trash2, ExternalLink, Route } from 'lucide-react'
+import { Target, ChevronDown, ChevronUp, CheckCircle, Circle, Clock, BookOpen, Trash2, ExternalLink, Route, BarChart3 } from 'lucide-react'
 import type { Goal, Milestone } from '@/types/goal'
 import { notify, confirmDialog } from '@/components/Toast'
 import { useTranslation } from '@/lib/LanguageContext'
@@ -144,13 +144,22 @@ function GoalCard({ goal, onDeleted, onMilestoneUpdated }: GoalCardProps) {
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             {expanded ? (t('common.close') || 'Hide details') : `View ${goal.milestones.length} milestones & resources`}
           </button>
-          <Link
-            href={`/goals/${goal.id}`}
-            className="flex items-center gap-1.5 text-xs text-cyan-200/70 hover:text-cyan-100 transition-colors"
-          >
-            <Route size={13} />
-            {t('goals.viewRoadmap') || 'Roadmap'}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/goals/${goal.id}/evaluation`}
+              className="flex items-center gap-1.5 text-xs text-orange-300/80 hover:text-orange-200 transition-colors"
+            >
+              <BarChart3 size={13} />
+              Analytics
+            </Link>
+            <Link
+              href={`/goals/${goal.id}`}
+              className="flex items-center gap-1.5 text-xs text-cyan-200/70 hover:text-cyan-100 transition-colors"
+            >
+              <Route size={13} />
+              {t('goals.viewRoadmap') || 'Roadmap'}
+            </Link>
+          </div>
         </div>
       </div>
 

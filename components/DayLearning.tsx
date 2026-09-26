@@ -24,6 +24,9 @@ interface VideoContent {
   videoId: string
   thumbnail: string
   channel?: string
+  global?: VideoContent | null
+  localized?: VideoContent | null
+  activeType?: 'global' | 'localized'
 }
 
 interface DocContent {
@@ -63,12 +66,15 @@ export default function DayLearning({
   initialQuizPassed?: boolean
   lastAttempt?: { score: number; total: number; passed: boolean } | null
 }) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const [content, setContent] = useState<DayContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(task?.completed ?? false)
   const [quizPassed, setQuizPassed] = useState(initialQuizPassed)
+  const [selectedVideoType, setSelectedVideoType] = useState<'global' | 'localized'>(
+    language && language !== 'en' ? 'localized' : 'global'
+  )
   const practiceUnlocked = quizPassed || initialQuizPassed
 
   useEffect(() => {
@@ -206,64 +212,151 @@ export default function DayLearning({
 
         {!loading && !error && content && (
           <div className="space-y-6 fade-up">
-            {/* Video */}
-            {content.video ? (
-              <section className="glass rounded-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <PlayCircle size={16} className="text-red-400" />
-                    {t('dayLearning.watchTutorial')}
+            {/* Dual Video Player (Global Best vs Language-Specific) */}
+            {(() => {
+              const vidData = content.video
+              const globalVid = vidData?.global || (vidData && (!vidData.localized || vidData.videoId === vidData.global?.videoId) ? vidData : null)
+              const localizedVid = vidData?.localized || null
+              const activeVideo = (selectedVideoType === 'localized' && localizedVid) ? localizedVid : (globalVid || localizedVid || vidData)
+
+              if (!vidData && !globalVid && !localizedVid) {
+                return (
+                  <section className="glass rounded-2xl p-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <PlayCircle size={20} className="text-white/30" />
+                      <div>
+                        <div className="text-sm font-medium text-white/80">No verified video tutorial attached</div>
+                        <div className="text-xs text-white/40">You can have AI search and verify global and language-specific tutorials.</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleReverifyVideo()}
+                      disabled={refreshingVideo}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 flex items-center gap-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      <Sparkles size={13} className="text-orange-300" />
+                      {refreshingVideo ? 'Finding...' : 'Find Dual Videos with AI'}
+                    </button>
+                  </section>
+                )
+              }
+
+              return (
+                <section className="glass rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                  {/* Top Bar with Dual Switcher */}
+                  <div className="p-4 sm:p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
+                        <PlayCircle size={16} className="text-red-400" />
+                        {t('dayLearning.watchTutorial') || 'Video Tutorials'}
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/20 font-normal">
+                          Dual Track
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/40 mt-0.5">
+                        Choose between top global masterclass or language-specific tutorial
+                      </p>
+                    </div>
+
+                    {/* Switcher & Re-verify Controls */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10">
+                        <button
+                          onClick={() => setSelectedVideoType('global')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                            selectedVideoType === 'global' || !localizedVid
+                              ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20'
+                              : 'text-white/50 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <span>🌐</span>
+                          <span>Global Best</span>
+                          {globalVid && <span className="text-[10px] opacity-75">({globalVid.channel || 'English'})</span>}
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedVideoType('localized')}
+                          disabled={!localizedVid && refreshingVideo}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                            selectedVideoType === 'localized' && localizedVid
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20'
+                              : 'text-white/50 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <span>🗣️</span>
+                          <span>Language Track</span>
+                          {localizedVid ? (
+                            <span className="text-[10px] opacity-75">({localizedVid.channel || 'Native'})</span>
+                          ) : (
+                            <span className="text-[10px] text-white/30">(Fetch)</span>
+                          )}
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleReverifyVideo()}
+                        disabled={refreshingVideo}
+                        title="Re-verify or fetch updated video recommendations"
+                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-orange-300 transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw size={13} className={refreshingVideo ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleReverifyVideo}
-                    disabled={refreshingVideo}
-                    title="Find and AI-verify a different video"
-                    className="text-xs text-white/40 hover:text-orange-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} className={refreshingVideo ? 'animate-spin' : ''} />
-                    {refreshingVideo ? 'Verifying...' : 'Re-verify Video'}
-                  </button>
-                </div>
-                <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
-                  <iframe
-                    className="absolute inset-0 w-full h-full"
-                    src={`https://www.youtube.com/embed/${content.video.videoId}`}
-                    title={content.video.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-                <div className="px-5 py-3 text-xs text-white/50 flex items-center justify-between gap-4">
-                  <span className="truncate">{content.video.title}{content.video.channel ? ` · ${content.video.channel}` : ''}</span>
-                  <a
-                    href={content.video.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-white/40 hover:text-white flex items-center gap-1 flex-shrink-0"
-                  >
-                    YouTube <ExternalLink size={12} />
-                  </a>
-                </div>
-              </section>
-            ) : (
-              <section className="glass rounded-2xl p-5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <PlayCircle size={20} className="text-white/30" />
-                  <div>
-                    <div className="text-sm font-medium text-white/80">No verified video tutorial attached</div>
-                    <div className="text-xs text-white/40">You can have AI search and verify a relevant tutorial for this topic.</div>
-                  </div>
-                </div>
-                <button
-                  onClick={handleReverifyVideo}
-                  disabled={refreshingVideo}
-                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 flex items-center gap-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
-                >
-                  <Sparkles size={13} className="text-orange-300" />
-                  {refreshingVideo ? 'Finding...' : 'Find Video with AI'}
-                </button>
-              </section>
-            )}
+
+                  {/* Active Video Player */}
+                  {activeVideo?.videoId ? (
+                    <div>
+                      <div className="relative w-full bg-black/60" style={{ aspectRatio: '16 / 9' }}>
+                        <iframe
+                          key={activeVideo.videoId}
+                          className="absolute inset-0 w-full h-full"
+                          src={`https://www.youtube.com/embed/${activeVideo.videoId}?autoplay=0&rel=0`}
+                          title={activeVideo.title}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                      <div className="px-5 py-3 text-xs bg-black/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            selectedVideoType === 'localized' && localizedVid
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                              : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                          }`}>
+                            {selectedVideoType === 'localized' && localizedVid ? 'Language Edition' : 'Global Masterclass'}
+                          </span>
+                          <span className="truncate text-white/70 font-medium">
+                            {activeVideo.title}
+                            {activeVideo.channel ? ` · ${activeVideo.channel}` : ''}
+                          </span>
+                        </div>
+                        <a
+                          href={activeVideo.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-white/45 hover:text-white flex items-center gap-1 flex-shrink-0 transition-colors"
+                        >
+                          Open in YouTube <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-white/[0.01]">
+                      <p className="text-sm text-white/60 mb-3">No video found for this specific option yet.</p>
+                      <button
+                        onClick={() => handleReverifyVideo()}
+                        disabled={refreshingVideo}
+                        className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5"
+                      >
+                        <Sparkles size={13} />
+                        {refreshingVideo ? 'Searching...' : 'Search YouTube with AI'}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )
+            })()}
 
             {/* Lesson */}
             {lesson && (

@@ -366,15 +366,86 @@ async function formatVideoResult(candidate: RawCandidate): Promise<VideoResult> 
   }
 }
 
+export interface DualVideoResult {
+  global: VideoResult | null
+  localized: VideoResult | null
+  activeType?: 'global' | 'localized'
+  // Backward compatibility fields
+  title: string
+  url: string
+  videoId: string
+  thumbnail: string
+  channel?: string
+}
+
+/**
+ * Find TWO high-quality video options for a topic:
+ * 1. Global / English authoritative master tutorial
+ * 2. Language-specific tutorial in the learner's chosen language (e.g., Hindi, Telugu, Spanish, etc.)
+ */
+export async function searchDualYouTube(
+  topic: string,
+  context: SearchVideoContext = {}
+): Promise<DualVideoResult | null> {
+  const { goalTitle = '', category = '', description = '', language = 'en' } = context
+
+  // 1. Fetch Global / English Video
+  const globalPromise = searchYouTube(topic, {
+    goalTitle,
+    category,
+    description,
+    language: 'en',
+  })
+
+  // 2. Fetch Language-Specific Video
+  const localizedPromise = (async () => {
+    if (language && language !== 'en') {
+      return searchYouTube(topic, {
+        goalTitle,
+        category,
+        description,
+        language,
+      })
+    }
+    // If language is English, find an alternate deep-dive/hands-on project video
+    return searchYouTube(`${topic} practical project build`, {
+      goalTitle,
+      category,
+      description,
+      language: 'en',
+    })
+  })()
+
+  const [globalVid, localizedVid] = await Promise.all([globalPromise, localizedPromise])
+
+  if (!globalVid && !localizedVid) return null
+
+  // Pick default active video: if learner has specific regional language and localized exists, prioritize it
+  const isRegional = language && language !== 'en'
+  const primary = (isRegional && localizedVid) ? localizedVid : (globalVid || localizedVid!)
+  const activeType: 'global' | 'localized' = (isRegional && localizedVid) ? 'localized' : 'global'
+
+  return {
+    global: globalVid,
+    localized: localizedVid,
+    activeType,
+    title: primary.title,
+    url: primary.url,
+    videoId: primary.videoId,
+    thumbnail: primary.thumbnail,
+    channel: primary.channel,
+  }
+}
+
 export interface ScrapedSources {
-  video: VideoResult | null
+  video: DualVideoResult | VideoResult | null
   docs: WebResult[]
   snippets: { source: string; text: string }[]
 }
 
 /**
- * Gather raw sources for a day's topic: one verified video, a few doc links, and the
- * extracted text of the top couple of docs (used to ground the AI lesson).
+ * Gather raw sources for a day's topic: verified dual video options (global + language-specific),
+ * documentation links, and extracted text of the top docs for AI lesson grounding.
  */
 export async function gatherSources(
   topic: string,
@@ -390,7 +461,7 @@ export async function gatherSources(
 
   const [docs, video] = await Promise.all([
     searchWeb(`${webQuery.trim()}`, 5),
-    searchYouTube(base, { goalTitle, category, description, language }),
+    searchDualYouTube(base, { goalTitle, category, description, language }),
   ])
 
   // Read the top 2 docs in parallel to build grounding snippets.

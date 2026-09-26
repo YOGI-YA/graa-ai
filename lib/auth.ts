@@ -49,6 +49,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || (process.env.NODE_ENV === 'development' ? 'graa-ai-dev-fallback-secret-key-32-chars-long' : undefined),
   providers,
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },

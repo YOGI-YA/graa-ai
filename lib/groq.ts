@@ -368,6 +368,95 @@ Generate exactly 4-6 milestones and 3-5 resources. The "days" array must cover t
   return draft
 }
 
+export async function generateRoadmapFromCurriculum(
+  curriculumText: string,
+  learningStyle?: string,
+  options: RoadmapOptions = {}
+): Promise<RoadmapDraft> {
+  const { skillLevel, apiKey, model, language } = options
+  const durationDays = clampDuration(options.durationDays)
+  const langInstruction = getLanguageInstruction(language)
+
+  const durationLine = durationDays
+    ? `Target duration requested by user: ${durationDays} days. Distribute the curriculum topics into exactly ${durationDays} daily progression units (day 1 through ${durationDays}) and set "durationDays" to ${durationDays}.`
+    : `Infer an optimal curriculum duration (between ${MIN_DURATION_DAYS} and ${MAX_DURATION_DAYS} days) based on the syllabus volume and depth. Set "durationDays" to this number and generate a day entry for every day.`
+
+  const prompt = `You are an elite academic curriculum architect and learning coach.
+You have been provided with an uploaded curriculum / syllabus document.
+
+Deeply analyze this curriculum, extracting all core units, chapters, learning outcomes, and topic sequences, and transform it into an actionable day-by-day learning roadmap.
+
+UPLOADED CURRICULUM TEXT:
+"""
+${curriculumText.slice(0, 14000)}
+"""
+
+${learningStyle ? `Learner style: ${learningStyle}` : ''}
+${skillLevel ? `Target skill level: ${skillLevel}` : ''}
+${langInstruction ? `${langInstruction}` : ''}
+${durationLine}
+
+INSTRUCTIONS:
+1. "title": Extract or infer a crisp, professional course/goal title directly from the curriculum.
+2. "description": 2-3 sentence summary of the curriculum scope and target learning outcomes.
+3. "category": Choose the best matching category (Programming, Data Science, Design, Language, Business, Mathematics, Science, Arts, Health, Other).
+4. "milestones": Map the syllabus's main Units / Modules / Chapters into 4-8 ordered milestones with detailed descriptions.
+5. "resources": Extract any referenced textbooks, reference guides, websites, or tools mentioned in the syllabus.
+6. "days": Sequence every subtopic logically day by day. Every single day must have a focused title matching the curriculum, a 1-sentence focus description, and a type ("lesson", "practice", "review", or "project").
+7. "advice": Personalized coaching advice on how to study and master this specific syllabus.
+
+Respond ONLY with a valid JSON object in the exact format:
+{
+  "title": "Curriculum / Course Title",
+  "description": "Comprehensive outcome description",
+  "category": "Programming|Data Science|Design|Language|Business|Mathematics|Science|Arts|Health|Other",
+  "targetDate": null,
+  "durationDays": ${durationDays ?? 'an optimal integer between 7 and 90'},
+  "skillLevel": ${skillLevel ? `"${skillLevel}"` : '"beginner|intermediate|advanced"'},
+  "milestones": [
+    {
+      "title": "Unit 1: Module Title",
+      "description": "Scope of unit",
+      "dueDate": null,
+      "order": 1
+    }
+  ],
+  "resources": [
+    {
+      "title": "Textbook / Reference Name",
+      "url": null,
+      "type": "book|course|video|article|tool|practice"
+    }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "week": 1,
+      "phase": "Unit 1",
+      "title": "Concrete curriculum subtopic",
+      "description": "1 sentence focus",
+      "type": "lesson|practice|review|project"
+    }
+  ],
+  "advice": "Personalized coaching strategy for this curriculum"
+}`
+
+  const content = await createChatCompletion([{ role: 'user', content: prompt }], {
+    temperature: 0.5,
+    maxTokens: 5000,
+    apiKey,
+    model,
+  })
+
+  const draft = normalizeDraft(parseRoadmapJson(content), durationDays)
+
+  if (durationDays && (draft.days?.length ?? 0) < durationDays) {
+    draft.days = await fillMissingDays(draft, durationDays, { apiKey, model, language })
+  }
+
+  return draft
+}
+
 
 async function generateDayRange(
   draft: RoadmapDraft,

@@ -1,9 +1,10 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
-import { ArrowUp, BookOpen, CalendarDays, Check, Loader2, Route, Sparkles } from 'lucide-react'
+import { ArrowUp, BookOpen, CalendarDays, Check, Loader2, Route, Sparkles, UploadCloud } from 'lucide-react'
 import type { Goal } from '@/types/goal'
 import { useTranslation } from '@/lib/LanguageContext'
+import CurriculumUploadModal from '@/components/CurriculumUploadModal'
 
 interface DraftMilestone {
   title: string
@@ -51,6 +52,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
   const [roadmap, setRoadmap] = useState<RoadmapDraft | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showCurriculumModal, setShowCurriculumModal] = useState(false)
   const [error, setError] = useState('')
 
   const promptPlaceholder = useMemo(() => (
@@ -300,10 +302,32 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
             <div className="w-full max-w-2xl mt-9">
               {composer}
               <p className="text-[11px] text-white/30 mt-3">{t('roadmap.daysEmptyHint') || 'Leave days empty and Graa picks a sensible length.'}</p>
+              
+              <div className="flex items-center gap-3 my-6 max-w-md mx-auto">
+                <div className="h-px bg-white/10 flex-1" />
+                <span className="text-[11px] text-white/35 uppercase tracking-wider font-semibold">Or</span>
+                <div className="h-px bg-white/10 flex-1" />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCurriculumModal(true)}
+                className="px-5 py-3 rounded-2xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-xs sm:text-sm font-medium inline-flex items-center gap-2.5 transition-all shadow-lg shadow-orange-500/10 group"
+              >
+                <UploadCloud size={18} className="text-orange-400 group-hover:scale-110 transition-transform" />
+                Upload Complete Curriculum / Syllabus (PDF, Word, Images)
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {showCurriculumModal && (
+        <CurriculumUploadModal
+          onClose={() => setShowCurriculumModal(false)}
+          onCreated={onCreated}
+        />
+      )}
     </section>
   )
 }
