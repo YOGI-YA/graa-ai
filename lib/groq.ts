@@ -4,15 +4,19 @@ import path from 'path'
 import { getLanguage } from './languages'
 
 function ensureEnvLoaded() {
-  for (const file of ['.env.local', '.env']) {
+  if (typeof process === 'undefined' || !process.env) return
+  // Only attempt fallback file reading if in non-production local environment without process.env loaded
+  if (process.env.NODE_ENV !== 'production' && !process.env.GROQ_API_KEY_1 && typeof window === 'undefined') {
     try {
-      const p = path.resolve(process.cwd(), file)
-      if (fs.existsSync(p)) {
-        const content = fs.readFileSync(p, 'utf-8')
-        for (const line of content.split('\n')) {
-          const match = line.match(/^([A-Za-z0-9_]+)=["']?([^"'\r\n]+)["']?/)
-          if (match && match[1] && match[2] && !process.env[match[1]]) {
-            process.env[match[1]] = match[2]
+      for (const file of ['.env.local', '.env']) {
+        const p = path.resolve(process.cwd(), file)
+        if (fs.existsSync(p)) {
+          const content = fs.readFileSync(p, 'utf-8')
+          for (const line of content.split('\n')) {
+            const match = line.match(/^([A-Za-z0-9_]+)=["']?([^"'\r\n]+)["']?/)
+            if (match && match[1] && match[2] && !process.env[match[1]]) {
+              process.env[match[1]] = match[2]
+            }
           }
         }
       }
