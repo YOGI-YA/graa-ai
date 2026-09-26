@@ -22,8 +22,7 @@ function ensureEnvLoaded() {
 ensureEnvLoaded()
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b'
-
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b'
 
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
 const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct'
@@ -37,27 +36,26 @@ interface GroqChatResponse {
   choices?: Array<{
     message?: {
       content?: string
+      reasoning?: string
     }
   }>
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-
 export function groqKeys(): string[] {
   ensureEnvLoaded()
   return Object.entries(process.env)
-    .filter(([k, v]) => /^GROQ_API_KEY\d*$/.test(k) && Boolean(v))
+    .filter(([k, v]) => /^GROQ_API_KEY.*$/i.test(k) && Boolean(v))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => v as string)
     .filter((k, i, arr) => arr.indexOf(k) === i)
 }
 
-// Each model has its OWN daily token pool, so when one is capped we switch models.
+// Order models by high TPM limits and fast JSON output
 function modelChain(primary: string): string[] {
-  return [primary, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
+  return [primary, 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b'].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
 }
-
 
 async function tryGroq(
   messages: ChatMessage[],
@@ -69,7 +67,7 @@ async function tryGroq(
 
   for (let round = 0; round < 3; round++) {
     for (const model of models) {
-      const maxTokens = model.startsWith('qwen') ? Math.min(options.maxTokens, 950) : Math.min(options.maxTokens, 2000)
+      const maxTokens = Math.min(options.maxTokens || 4000, 4096)
       for (const key of keys) {
         try {
           const response = await axios.post<GroqChatResponse>(
@@ -87,7 +85,7 @@ async function tryGroq(
         }
       }
     }
-    await sleep(1800 * (round + 1))
+    await sleep(1200 * (round + 1))
   }
   return null // all Groq attempts rate-limited
 }
@@ -101,7 +99,7 @@ async function tryNvidia(
   try {
     const response = await axios.post<GroqChatResponse>(
       NVIDIA_URL,
-      { model: NVIDIA_MODEL, messages, max_tokens: options.maxTokens, temperature: options.temperature, top_p: 0.95, stream: false },
+      { model: NVIDIA_MODEL, messages, max_tokens: Math.min(options.maxTokens, 2048), temperature: options.temperature, top_p: 0.95, stream: false },
       { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' } }
     )
     return response.data.choices?.[0]?.message?.content?.trim() || ''
@@ -184,25 +182,41 @@ export function getLanguageInstruction(langCode?: string | null): string {
 
 function extractJson<T = any>(content: string): T {
   let clean = content.trim()
-  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+  
+  // Remove markdown code fences if wrapped entirely
+  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+
+  // Find object bounds
   const firstBrace = clean.indexOf('{')
-  if (firstBrace === -1) {
-    const firstBracket = clean.indexOf('[')
-    if (firstBracket !== -1) {
-      clean = clean.slice(firstBracket)
+  const lastBrace = clean.lastIndexOf('}')
+  
+  // Find array bounds
+  const firstBracket = clean.indexOf('[')
+  const lastBracket = clean.lastIndexOf(']')
+
+  let target = clean
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    if (firstBracket === -1 || firstBrace <= firstBracket) {
+      target = clean.slice(firstBrace, lastBrace + 1)
+    } else if (lastBracket !== -1 && lastBracket > firstBracket) {
+      target = clean.slice(firstBracket, lastBracket + 1)
     }
-  } else {
-    clean = clean.slice(firstBrace)
+  } else if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    target = clean.slice(firstBracket, lastBracket + 1)
+  } else if (firstBrace !== -1) {
+    target = clean.slice(firstBrace)
+  } else if (firstBracket !== -1) {
+    target = clean.slice(firstBracket)
   }
 
   // 1. Direct parse attempt
   try {
-    return JSON.parse(clean)
+    return JSON.parse(target)
   } catch {}
 
   // 2. Trailing comma cleanup
   try {
-    const relaxed = clean.replace(/,\s*([}\]])/g, '$1')
+    const relaxed = target.replace(/,\s*([}\]])/g, '$1')
     return JSON.parse(relaxed)
   } catch {}
 
@@ -212,8 +226,8 @@ function extractJson<T = any>(content: string): T {
   const stack: string[] = []
   let lastSafeIndex = 0
 
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean[i]
+  for (let i = 0; i < target.length; i++) {
+    const char = target[i]
     if (escaped) {
       escaped = false
       continue
@@ -240,7 +254,7 @@ function extractJson<T = any>(content: string): T {
   }
 
   if (lastSafeIndex > 0) {
-    let candidate = clean.slice(0, lastSafeIndex).trim()
+    let candidate = target.slice(0, lastSafeIndex).trim()
     if (candidate.endsWith(',')) candidate = candidate.slice(0, -1).trim()
     
     const s: string[] = []
@@ -261,7 +275,8 @@ function extractJson<T = any>(content: string): T {
       candidate += open === '{' ? '}' : ']'
     }
     try {
-      return JSON.parse(candidate)
+      const relaxedCandidate = candidate.replace(/,\s*([}\]])/g, '$1')
+      return JSON.parse(relaxedCandidate)
     } catch {}
   }
 
@@ -443,7 +458,7 @@ Respond ONLY with a valid JSON object in the exact format:
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 5000,
+    maxTokens: 3000,
     apiKey,
     model,
   })

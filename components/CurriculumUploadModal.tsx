@@ -95,7 +95,14 @@ export default function CurriculumUploadModal({
         setExtractedPreview(data.text)
       }
 
-      // Now save the generated roadmap into a Goal
+      // If goal was atomically created by the API, use it immediately
+      if (data.goal) {
+        notify('Curriculum roadmap generated successfully!', 'success')
+        onCreated(data.goal)
+        return
+      }
+
+      // Fallback: save roadmap to goal
       setStatusMessage('Finalizing and saving your customized roadmap...')
       const goalRes = await fetch('/api/goals', {
         method: 'POST',

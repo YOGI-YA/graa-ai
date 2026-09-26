@@ -100,43 +100,72 @@ export async function POST(req: NextRequest) {
     // Fall back to the generated day count if no duration was given.
     if (!durationDays && days.length > 0) durationDays = days.length
 
+    // Sanitize milestones
+    const cleanMilestones = milestones
+      .filter(m => m && typeof m.title === 'string' && m.title.trim())
+      .map((m, index) => ({
+        title: m.title.trim().slice(0, 300),
+        description: (typeof m.description === 'string' ? m.description.trim() : '').slice(0, 2000),
+        order: typeof m.order === 'number' ? m.order : index + 1,
+        dueDate: parseDate(m.dueDate),
+      }))
+
+    // Sanitize resources
+    const cleanResources = resources
+      .filter(r => r && typeof r.title === 'string' && r.title.trim())
+      .map(r => ({
+        title: r.title.trim().slice(0, 300),
+        url: typeof r.url === 'string' && r.url.startsWith('http') ? r.url.slice(0, 500) : null,
+        type: (typeof r.type === 'string' ? r.type : 'article').slice(0, 50),
+      }))
+
+    // Sanitize daily tasks ensuring unique day numbers
+    const cleanDays = days
+      .filter(d => d && typeof d.title === 'string' && d.title.trim())
+      .map((d, index) => ({
+        day: typeof d.day === 'number' && d.day > 0 ? d.day : index + 1,
+        week: typeof d.week === 'number' ? d.week : Math.floor(index / 7) + 1,
+        phase: (typeof d.phase === 'string' ? d.phase : null)?.slice(0, 200) || null,
+        title: d.title.trim().slice(0, 300),
+        description: (typeof d.description === 'string' ? d.description.trim() : '').slice(0, 2000),
+        type: (typeof d.type === 'string' ? d.type : 'lesson').slice(0, 50),
+      }))
+      .filter((d, i, arr) => arr.findIndex(x => x.day === d.day) === i)
+
+    // Build compact serializable planJson
+    const planJson = body.milestones ? {
+      title: title.slice(0, 300),
+      description: description.slice(0, 2000),
+      category: category.slice(0, 100),
+      durationDays,
+      skillLevel,
+      language,
+      milestones: cleanMilestones,
+      resources: cleanResources,
+      days: cleanDays,
+      advice: (advice || '').slice(0, 2000),
+      curriculumFileName: typeof body.curriculumFileName === 'string' ? body.curriculumFileName.slice(0, 255) : undefined,
+    } : undefined
+
     const goal = await prisma.goal.create({
       data: {
-        title,
-        description,
-        category,
+        title: title.slice(0, 300),
+        description: description.slice(0, 3000),
+        category: category.slice(0, 100),
         targetDate,
         durationDays,
         skillLevel,
         language,
-        planJson: body.milestones ? body : undefined,
+        planJson: planJson ? (JSON.parse(JSON.stringify(planJson))) : undefined,
         userId: session.user.id,
         milestones: {
-          create: milestones.map((m, index) => ({
-            title: m.title,
-            description: m.description,
-            order: typeof m.order === 'number' ? m.order : index + 1,
-            dueDate: parseDate(m.dueDate),
-          })),
+          create: cleanMilestones,
         },
         resources: {
-          create: resources.map(r => ({
-            title: r.title,
-            url: r.url || null,
-            type: r.type || 'article',
-          })),
+          create: cleanResources,
         },
         tasks: {
-          create: days
-            .filter(d => d && typeof d.title === 'string')
-            .map((d, index) => ({
-              day: typeof d.day === 'number' && d.day > 0 ? d.day : index + 1,
-              week: typeof d.week === 'number' ? d.week : Math.floor(index / 7) + 1,
-              phase: typeof d.phase === 'string' ? d.phase : null,
-              title: d.title,
-              description: typeof d.description === 'string' ? d.description : '',
-              type: typeof d.type === 'string' ? d.type : 'lesson',
-            })),
+          create: cleanDays,
         },
       },
       select: goalSelect,
@@ -146,6 +175,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ goal, advice })
   } catch (error) {
     logger.error('GOALS', 'Failed to create goal', error)
-    return NextResponse.json({ error: 'Failed to create goal roadmap. Please try again.' }, { status: 500 })
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Failed to create goal roadmap. Please try again.',
+    }, { status: 500 })
   }
 }
