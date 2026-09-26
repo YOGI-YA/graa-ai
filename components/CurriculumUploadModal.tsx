@@ -20,6 +20,7 @@ import { INDIAN_LANGUAGES } from '@/lib/languages'
 import { useTranslation } from '@/lib/LanguageContext'
 import type { Goal } from '@/types/goal'
 import { notify } from '@/components/Toast'
+import { extractTextFromCurriculumClient } from '@/lib/clientCurriculumParser'
 
 const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced']
 
@@ -70,23 +71,62 @@ export default function CurriculumUploadModal({
 
     setIsProcessing(true)
     setError('')
-    setStatusMessage('Reading & parsing curriculum document...')
+    setStatusMessage('Reading & extracting curriculum text...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('language', selectedLanguage)
-      if (skillLevel) formData.append('skillLevel', skillLevel)
-      if (durationDays) formData.append('durationDays', durationDays)
+      // 1. First, attempt high-speed client-side extraction in the browser.
+      // This sends a ~15KB text payload instead of a 7MB binary file,
+      // bypassing Vercel's 4.5MB Serverless limit (HTTP 413) completely.
+      let clientExtractedText = ''
+      try {
+        clientExtractedText = await extractTextFromCurriculumClient(file)
+      } catch (err) {
+        console.warn('Client-side extraction fallback:', err)
+      }
 
       setStatusMessage('Analyzing syllabus structure & generating day-by-day roadmap...')
 
-      const res = await fetch('/api/curriculum/parse', {
-        method: 'POST',
-        body: formData,
-      })
+      let res: Response
+      if (clientExtractedText && clientExtractedText.length > 20) {
+        res = await fetch('/api/curriculum/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: clientExtractedText,
+            fileName: file.name,
+            language: selectedLanguage,
+            skillLevel: skillLevel || undefined,
+            durationDays: durationDays ? parseInt(durationDays, 10) : undefined,
+          }),
+        })
+      } else {
+        // Fallback for image scans / binary formats: send formData
+        if (file.size > 4.5 * 1024 * 1024) {
+          throw new Error('File size exceeds 4.5MB cloud upload limit. Please upload a standard PDF, Word doc, or text syllabus.')
+        }
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('language', selectedLanguage)
+        if (skillLevel) formData.append('skillLevel', skillLevel)
+        if (durationDays) formData.append('durationDays', durationDays)
 
-      const data = await res.json()
+        res = await fetch('/api/curriculum/parse', {
+          method: 'POST',
+          body: formData,
+        })
+      }
+
+      if (res.status === 413) {
+        throw new Error('Document payload is too large for cloud upload. Please try a text or standard PDF file.')
+      }
+
+      let data: any
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error(`Server returned status ${res.status}: Failed to process curriculum`)
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to process curriculum file')
       }
@@ -113,7 +153,13 @@ export default function CurriculumUploadModal({
         }),
       })
 
-      const goalData = await goalRes.json()
+      let goalData: any
+      try {
+        goalData = await goalRes.json()
+      } catch {
+        throw new Error('Failed to save generated roadmap')
+      }
+
       if (!goalRes.ok) {
         throw new Error(goalData.error || 'Failed to create goal from curriculum')
       }

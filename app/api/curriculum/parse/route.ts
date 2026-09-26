@@ -41,40 +41,66 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formData = await req.formData()
-    const file = formData.get('file') as File | null
-    const language = (formData.get('language') as string) || session.user.language || 'en'
-    const skillLevel = (formData.get('skillLevel') as string) || undefined
-    const durationDaysRaw = formData.get('durationDays') as string | null
-    const durationDays = durationDaysRaw ? parseInt(durationDaysRaw, 10) : undefined
-    const generateOnlyText = formData.get('extractOnly') === 'true'
+    const contentType = req.headers.get('content-type') || ''
+    let extractedText = ''
+    let fileName = 'curriculum.pdf'
+    let language = session.user.language || 'en'
+    let skillLevel: string | undefined = undefined
+    let durationDays: number | undefined = undefined
+    let generateOnlyText = false
 
-    if (!file) {
-      return NextResponse.json({ error: 'No curriculum file was provided.' }, { status: 400 })
+    if (contentType.includes('application/json')) {
+      const body = await req.json()
+      extractedText = typeof body.text === 'string' ? body.text.trim() : ''
+      fileName = typeof body.fileName === 'string' ? body.fileName : 'curriculum.pdf'
+      if (body.language) language = body.language
+      if (body.skillLevel) skillLevel = body.skillLevel
+      if (body.durationDays) durationDays = parseInt(body.durationDays, 10)
+      generateOnlyText = body.extractOnly === true
+    } else {
+      const formData = await req.formData()
+      const file = formData.get('file') as File | null
+      const directText = formData.get('text') as string | null
+      if (formData.get('language')) language = formData.get('language') as string
+      if (formData.get('skillLevel')) skillLevel = formData.get('skillLevel') as string
+      const durationDaysRaw = formData.get('durationDays') as string | null
+      if (durationDaysRaw) durationDays = parseInt(durationDaysRaw, 10)
+      generateOnlyText = formData.get('extractOnly') === 'true'
+
+      if (directText && directText.trim()) {
+        extractedText = directText.trim()
+        fileName = (formData.get('fileName') as string) || 'curriculum.txt'
+      } else if (file) {
+        fileName = file.name
+        // Limit file size
+        if (file.size > 50 * 1024 * 1024) {
+          return NextResponse.json({ error: 'File size exceeds 50MB limit.' }, { status: 400 })
+        }
+        const arrayBuffer = await file.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        logger.info('CURRICULUM_UPLOAD', 'Parsing curriculum file on server', {
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          userId: session.user.id,
+        })
+        const extracted = await parseCurriculumBuffer(buffer, file.name, file.type)
+        extractedText = extracted.text
+      }
     }
 
-    // Limit file size to 50MB
-    if (file.size > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size exceeds 50MB limit.' }, { status: 400 })
+    if (!extractedText) {
+      return NextResponse.json(
+        { error: 'Could not extract text from document. Please ensure it is not an empty or password-protected file.' },
+        { status: 400 }
+      )
     }
-
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    logger.info('CURRICULUM_UPLOAD', 'Parsing curriculum file', {
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-      userId: session.user.id,
-    })
-
-    const extracted = await parseCurriculumBuffer(buffer, file.name, file.type)
 
     if (generateOnlyText) {
       return NextResponse.json({
-        text: extracted.text,
-        fileName: extracted.fileName,
-        charCount: extracted.charCount,
+        text: extractedText,
+        fileName,
+        charCount: extractedText.length,
       })
     }
 
@@ -85,14 +111,14 @@ export async function POST(req: NextRequest) {
     })
 
     logger.info('CURRICULUM_GEN', 'Generating roadmap from curriculum text', {
-      charCount: extracted.charCount,
+      charCount: extractedText.length,
       language: language || user?.language,
       skillLevel,
       durationDays,
     })
 
     const roadmap = await generateRoadmapFromCurriculum(
-      extracted.text,
+      extractedText,
       user?.learningStyle || undefined,
       {
         durationDays: durationDays || null,
@@ -147,7 +173,7 @@ export async function POST(req: NextRequest) {
       resources: cleanResources,
       days: cleanDays,
       advice: (roadmap.advice || '').slice(0, 2000),
-      curriculumFileName: extracted.fileName.slice(0, 255),
+      curriculumFileName: fileName.slice(0, 255),
     }
 
     // Atomically create the Goal in PostgreSQL
@@ -183,9 +209,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       goal,
       roadmap: planJson,
-      text: extracted.text,
-      fileName: extracted.fileName,
-      charCount: extracted.charCount,
+      text: extractedText,
+      fileName,
+      charCount: extractedText.length,
     })
   } catch (error) {
     logger.error('CURRICULUM_UPLOAD', 'Failed to parse and generate from curriculum', error)
