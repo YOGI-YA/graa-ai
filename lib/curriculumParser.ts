@@ -248,6 +248,36 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   }
 }
 
+async function extractViaMicroservice(buffer: Buffer, fileName: string): Promise<string | null> {
+  const serviceUrl = process.env.PDF_EXTRACTOR_SERVICE_URL
+  if (!serviceUrl) return null
+
+  try {
+    const endpoint = `${serviceUrl.replace(/\/+$/, '')}/extract`
+    const blob = new Blob([new Uint8Array(buffer)])
+    const formData = new FormData()
+    formData.append('file', blob, fileName)
+
+    const res = await axios.post(endpoint, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 35000,
+    })
+
+    if (res.data?.success && typeof res.data.text === 'string' && res.data.text.trim()) {
+      logger.info('CURRICULUM_PARSE', 'Extracted curriculum via Render Microservice', {
+        charCount: res.data.char_count,
+        unitsDetected: res.data.units_detected,
+      })
+      return res.data.text.trim()
+    }
+  } catch (err) {
+    logger.warn('CURRICULUM_PARSE', 'Microservice call failed, falling back to local extractor', {
+      err: err instanceof Error ? err.message : String(err),
+    })
+  }
+  return null
+}
+
 export async function parseCurriculumBuffer(
   buffer: Buffer,
   fileName: string,
@@ -255,6 +285,16 @@ export async function parseCurriculumBuffer(
 ): Promise<{ text: string; fileName: string; charCount: number }> {
   const ext = fileName.toLowerCase().split('.').pop() || ''
   let text = ''
+
+  // 1. Try dedicated microservice first if configured
+  const microserviceText = await extractViaMicroservice(buffer, fileName)
+  if (microserviceText) {
+    return {
+      text: microserviceText,
+      fileName,
+      charCount: microserviceText.length,
+    }
+  }
 
   if (ext === 'pdf' || mimeType === 'application/pdf') {
     text = await extractTextFromPdf(buffer)
