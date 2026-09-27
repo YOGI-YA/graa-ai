@@ -1,9 +1,10 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useState } from 'react'
-import { ArrowUp, BookOpen, CalendarDays, Check, Loader2, Route, Sparkles, UploadCloud } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowUp, BookOpen, CalendarDays, Check, Globe, Loader2, Route, Sparkles, UploadCloud } from 'lucide-react'
 import type { Goal } from '@/types/goal'
 import { useTranslation } from '@/lib/LanguageContext'
+import { INDIAN_LANGUAGES } from '@/lib/languages'
 import CurriculumUploadModal from '@/components/CurriculumUploadModal'
 
 interface DraftMilestone {
@@ -49,11 +50,18 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
   const [prompt, setPrompt] = useState('')
   const [days, setDays] = useState('')
   const [skillLevel, setSkillLevel] = useState('')
+  const [selectedLang, setSelectedLang] = useState(language || 'en')
   const [roadmap, setRoadmap] = useState<RoadmapDraft | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showCurriculumModal, setShowCurriculumModal] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (language) {
+      setSelectedLang(language)
+    }
+  }, [language])
 
   const promptPlaceholder = useMemo(() => (
     roadmap
@@ -76,7 +84,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
           roadmap,
           durationDays: days ? Number(days) : undefined,
           skillLevel: skillLevel || undefined,
-          language,
+          language: selectedLang,
         }),
       })
       const data = await res.json()
@@ -90,7 +98,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
     } finally {
       setLoading(false)
     }
-  }, [days, language, loading, prompt, roadmap, saving, skillLevel])
+  }, [days, loading, prompt, roadmap, saving, selectedLang, skillLevel])
 
   const beginRoadmap = useCallback(async () => {
     if (!roadmap || saving) return
@@ -102,7 +110,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
       const res = await fetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...roadmap, language }),
+        body: JSON.stringify({ ...roadmap, language: selectedLang }),
       })
       const data = await res.json()
 
@@ -114,7 +122,7 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
       setError(error instanceof Error ? error.message : 'Failed to create goal')
       setSaving(false)
     }
-  }, [language, onCreated, roadmap, router, saving])
+  }, [onCreated, roadmap, router, saving, selectedLang])
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -135,8 +143,8 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
           placeholder={promptPlaceholder}
           className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1.5 text-sm text-white placeholder-white/35 focus:outline-none min-h-[48px] max-h-40"
         />
-        <div className="flex items-center justify-between gap-2 pl-1.5 pr-1 pb-0.5">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-2 pl-1.5 pr-1 pb-0.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {!roadmap && (
               <>
                 <div className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] transition-colors px-2.5 py-1.5">
@@ -163,13 +171,28 @@ export default function EmptyRoadmapBuilder({ onCreated }: { onCreated: (goal: G
                     </option>
                   ))}
                 </select>
+                <div className="flex items-center gap-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.07] transition-colors px-2 py-1.5">
+                  <Globe size={13} className="text-orange-400" />
+                  <select
+                    value={selectedLang}
+                    onChange={e => setSelectedLang(e.target.value)}
+                    className="bg-transparent text-xs text-white/70 focus:outline-none cursor-pointer max-w-[110px]"
+                    aria-label="Roadmap Language"
+                  >
+                    {INDIAN_LANGUAGES.map(l => (
+                      <option key={l.code} value={l.code} className="bg-[#15151a]">
+                        {l.nativeName} ({l.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </>
             )}
           </div>
           <button
             onClick={generateRoadmap}
             disabled={loading || saving || !prompt.trim()}
-            className="w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40 disabled:hover:bg-orange-500 transition-colors flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40 disabled:hover:bg-orange-500 transition-colors flex items-center justify-center flex-shrink-0 ml-auto"
             aria-label={roadmap ? (t('roadmap.wantChanges') || 'Update roadmap') : (t('goalModal.generateBtn') || 'Generate roadmap')}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={17} />}

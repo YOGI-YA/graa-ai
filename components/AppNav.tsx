@@ -5,7 +5,6 @@ import { signOut } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
 import { LayoutDashboard, Target, User, Plus, LogOut } from 'lucide-react'
 import Logo from '@/components/Logo'
-import LanguageSelector from '@/components/LanguageSelector'
 import { useTranslation } from '@/lib/LanguageContext'
 
 interface AppNavProps {
@@ -62,8 +61,6 @@ export default function AppNav({ firstName, onNewGoal }: AppNavProps) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <LanguageSelector variant="compact" />
-
           {onNewGoal && (
             <button onClick={onNewGoal} className="btn-primary hidden sm:flex px-3 py-1.5 text-xs items-center gap-1.5">
               <Plus size={14} />

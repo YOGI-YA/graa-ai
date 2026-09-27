@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X,
   UploadCloud,
@@ -39,6 +39,12 @@ export default function CurriculumUploadModal({
   const [selectedLanguage, setSelectedLanguage] = useState(language || 'en')
   const [skillLevel, setSkillLevel] = useState('')
   const [durationDays, setDurationDays] = useState('')
+
+  useEffect(() => {
+    if (language) {
+      setSelectedLanguage(language)
+    }
+  }, [language])
 
   const [isProcessing, setIsProcessing] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')

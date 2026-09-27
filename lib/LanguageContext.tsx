@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useTransition, u
 import { getLanguage, LanguageInfo, DEFAULT_LANGUAGE } from '@/lib/languages'
 import { translate } from '@/lib/i18n'
 import { useSession } from 'next-auth/react'
+import FirstTimeLanguageModal from '@/components/FirstTimeLanguageModal'
 
 interface LanguageContextType {
   language: string
@@ -11,6 +12,9 @@ interface LanguageContextType {
   isRTL: boolean
   dir: 'ltr' | 'rtl'
   t: (key: string, params?: Record<string, string | number>) => string
+  isLanguageModalOpen: boolean
+  openLanguageModal: () => void
+  closeLanguageModal: () => void
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
@@ -18,20 +22,22 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const [language, setLanguageState] = useState<string>(DEFAULT_LANGUAGE)
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false)
   const [, startTransition] = useTransition()
 
-  // Initialize from storage or cookie on mount
+  // Initialize from storage or cookie on mount & check for first-time prompt
   useEffect(() => {
     try {
       const stored = localStorage.getItem('graa_lang')
+      const prompted = localStorage.getItem('graa_language_prompted')
+
       if (stored) {
         setLanguageState(stored)
-        return
       }
-      const match = document.cookie.match(/(^|;)\s*graa_lang=([^;]+)/)
-      if (match && match[2]) {
-        setLanguageState(decodeURIComponent(match[2]))
-        return
+
+      // If user has not chosen or been prompted yet, show the first-time modal
+      if (!prompted && !stored) {
+        setIsLanguageModalOpen(true)
       }
     } catch {}
   }, [])
@@ -43,6 +49,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLanguageState(userLang)
       try {
         localStorage.setItem('graa_lang', userLang)
+        localStorage.setItem('graa_language_prompted', 'true')
         document.cookie = `graa_lang=${encodeURIComponent(userLang)}; path=/; max-age=31536000; SameSite=Lax`
       } catch {}
     }
@@ -58,13 +65,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     try {
       localStorage.setItem('graa_lang', cleanCode)
+      localStorage.setItem('graa_language_prompted', 'true')
       document.cookie = `graa_lang=${encodeURIComponent(cleanCode)}; path=/; max-age=31536000; SameSite=Lax`
       document.documentElement.dir = langObj.dir
       document.documentElement.lang = cleanCode
 
-      // If user is logged in, optionally persist preference to profile
+      // If user is logged in, persist preference to profile
       if (session?.user) {
-        fetch('/api/user/profile', {
+        fetch('/api/profile', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ language: cleanCode }),
@@ -72,6 +80,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
   }, [session])
+
+  const openLanguageModal = useCallback(() => {
+    setIsLanguageModalOpen(true)
+  }, [])
+
+  const closeLanguageModal = useCallback(() => {
+    try {
+      localStorage.setItem('graa_language_prompted', 'true')
+    } catch {}
+    setIsLanguageModalOpen(false)
+  }, [])
 
   // Update HTML tag attributes on language change
   useEffect(() => {
@@ -99,9 +118,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         isRTL,
         dir: currentLang.dir,
         t,
+        isLanguageModalOpen,
+        openLanguageModal,
+        closeLanguageModal,
       }}
     >
       {children}
+      <FirstTimeLanguageModal
+        isOpen={isLanguageModalOpen}
+        onClose={closeLanguageModal}
+      />
     </LanguageContext.Provider>
   )
 }
@@ -118,7 +144,11 @@ export function useTranslation() {
       isRTL: false,
       dir: 'ltr' as const,
       t: (key: string, params?: Record<string, string | number>) => translate(DEFAULT_LANGUAGE, key, params),
+      isLanguageModalOpen: false,
+      openLanguageModal: () => {},
+      closeLanguageModal: () => {},
     }
   }
   return context
 }
+

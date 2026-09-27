@@ -5,7 +5,6 @@ import {
   PlayCircle, FileText, Bot, Check,
 } from 'lucide-react'
 import Logo from '@/components/Logo'
-import LanguageSelector from '@/components/LanguageSelector'
 import { useTranslation } from '@/lib/LanguageContext'
 
 const FEATURES = [
@@ -37,7 +36,6 @@ export default function HomePage() {
             <a href="#features" className="hover:text-white transition-colors">Features</a>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <LanguageSelector variant="compact" />
             <Link href="/login" className="btn-outline px-3 sm:px-4 py-2 text-xs sm:text-sm">{t('nav.signIn') || "Login"}</Link>
             <Link href="/register" className="btn-primary px-3 sm:px-4 py-2 text-xs sm:text-sm">{t('nav.getStarted') || "Get started"}</Link>
           </div>

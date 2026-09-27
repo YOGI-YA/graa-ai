@@ -48,14 +48,14 @@ export default function ProfilePage() {
           setProfile(d)
           setName(d.name)
           setLearningStyle(d.learningStyle || '')
-          if (d.language && d.language !== language) {
+          if (d.language) {
             setLanguage(d.language)
           }
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [status, setLanguage, language])
+  }, [status])
 
   const save = useCallback(async () => {
     setSaving(true)

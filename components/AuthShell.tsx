@@ -2,7 +2,6 @@
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import Logo from '@/components/Logo'
-import LanguageSelector from '@/components/LanguageSelector'
 import { useTranslation } from '@/lib/LanguageContext'
 
 // Compact split-screen auth: tight form on the left, brand showcase on the right.
@@ -27,9 +26,6 @@ export default function AuthShell({
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Form side */}
       <div className="flex flex-col justify-center px-5 py-10 sm:px-8 relative">
-        <div className="absolute top-6 right-6 z-20">
-          <LanguageSelector variant="compact" />
-        </div>
         <div className="w-full max-w-sm mx-auto fade-up">
           <Link href="/" className="inline-flex mb-8">
             <Logo size={32} />

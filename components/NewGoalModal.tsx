@@ -26,6 +26,12 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
   const [advice, setAdvice] = useState('')
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => {
+    if (language) {
+      setForm(f => ({ ...f, language }))
+    }
+  }, [language])
+
   useEffect(() => () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
   }, [])
