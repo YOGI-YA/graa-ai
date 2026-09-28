@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Loader2, Flame, ArrowRight, PlayCircle, BookOpen, UploadCloud, BarChart3 } from 'lucide-react'
+import { Plus, Loader2, Flame, ArrowRight, PlayCircle, BookOpen, UploadCloud, BarChart3, TrendingUp } from 'lucide-react'
 import GoalCard from '@/components/GoalCard'
 import NewGoalModal from '@/components/NewGoalModal'
 import CurriculumUploadModal from '@/components/CurriculumUploadModal'
@@ -79,6 +79,12 @@ export default function Dashboard() {
   const closeNewGoal = useCallback(() => setShowNewGoal(false), [])
 
   const handleGoalCreated = useCallback((goal: Goal) => { setShowNewGoal(false); setGoals(prev => [goal, ...prev]) }, [])
+  // Curriculum uploads navigate directly to the generated roadmap
+  const handleCurriculumGoalCreated = useCallback((goal: Goal) => {
+    setShowCurriculumModal(false)
+    setGoals(prev => [goal, ...prev])
+    router.push(`/goals/${goal.id}`)
+  }, [router])
   const handleGoalDeleted = useCallback((goalId: string) => { setGoals(prev => prev.filter(g => g.id !== goalId)) }, [])
   const handleMilestoneUpdated = useCallback((goalId: string, milestone: Milestone) => {
     setGoals(prev => prev.map(goal => goal.id !== goalId ? goal : {
@@ -183,6 +189,12 @@ export default function Dashboard() {
               <p className="text-white/40 text-sm mt-1">{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {stats.completedGoals} completed</p>
             </div>
             <div className="flex items-center gap-2.5">
+              <Link
+                href="/dashboard/performance"
+                className="px-4 py-2 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 text-xs sm:text-sm font-medium flex items-center gap-2 transition-all shadow-md"
+              >
+                <TrendingUp size={16} /> Performance
+              </Link>
               <button
                 onClick={() => setShowCurriculumModal(true)}
                 className="px-4 py-2 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-xs sm:text-sm font-medium flex items-center gap-2 transition-all shadow-md"
@@ -207,7 +219,7 @@ export default function Dashboard() {
       {showCurriculumModal && (
         <CurriculumUploadModal
           onClose={() => setShowCurriculumModal(false)}
-          onCreated={handleGoalCreated}
+          onCreated={handleCurriculumGoalCreated}
         />
       )}
     </div>

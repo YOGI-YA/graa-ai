@@ -140,6 +140,23 @@ function parseDuration(text?: string): number {
 /**
  * Scrape raw candidate videos from YouTube search results for a given query.
  */
+/**
+ * Extract channel name from a YouTube HTML snippet surrounding a videoRenderer.
+ * Looks for "ownerText" or "longBylineText" patterns.
+ */
+function extractChannelFromSnippet(snippet: string): string | undefined {
+  // Pattern 1: ownerText → runs → text
+  const ownerMatch = snippet.match(/"ownerText":\{"runs":\[\{"text":"([^"]+)"/)
+  if (ownerMatch?.[1]) return ownerMatch[1].replace(/\\u0026/g, '&').replace(/\\"/g, '"')
+  // Pattern 2: longBylineText → runs → text
+  const bylineMatch = snippet.match(/"longBylineText":\{"runs":\[\{"text":"([^"]+)"/)
+  if (bylineMatch?.[1]) return bylineMatch[1].replace(/\\u0026/g, '&').replace(/\\"/g, '"')
+  // Pattern 3: shortBylineText
+  const shortMatch = snippet.match(/"shortBylineText":\{"runs":\[\{"text":"([^"]+)"/)
+  if (shortMatch?.[1]) return shortMatch[1].replace(/\\u0026/g, '&').replace(/\\"/g, '"')
+  return undefined
+}
+
 async function fetchYouTubeCandidates(query: string, maxResults = 10): Promise<RawCandidate[]> {
   try {
     const res = await axios.get('https://www.youtube.com/results', {
@@ -157,14 +174,20 @@ async function fetchYouTubeCandidates(query: string, maxResults = 10): Promise<R
     const candidates: RawCandidate[] = []
     let m: RegExpExecArray | null
     while ((m = re.exec(html)) && candidates.length < maxResults) {
-      const [, videoId, rawTitle, lengthText, viewsText] = m
+      const [fullMatch, videoId, rawTitle, lengthText, viewsText] = m
       if (seen.has(videoId)) continue
       seen.add(videoId)
+      // Extract channel name from the surrounding HTML context
+      const contextStart = Math.max(0, m.index - 200)
+      const contextEnd = Math.min(html.length, m.index + fullMatch.length + 800)
+      const context = html.slice(contextStart, contextEnd)
+      const channel = extractChannelFromSnippet(context)
       candidates.push({
         videoId,
         title: rawTitle.replace(/\\u0026/g, '&').replace(/\\"/g, '"'),
         durationSec: parseDuration(lengthText),
         views: viewsText ? parseInt(viewsText.replace(/[^0-9]/g, ''), 10) || 0 : 0,
+        channel,
       })
     }
 
@@ -225,24 +248,26 @@ export async function searchYouTube(
   const { goalTitle = '', category = '', description = '', language = 'en' } = context
   const lang = getLanguage(language)
 
-  // 1. Build targeted search queries to capture high-precision global and localized results
+  // 1. Build targeted search queries — ALWAYS anchor with goal title for disambiguation
   const queries: string[] = []
   const isRegional = language && language !== 'en'
+  const goalAnchor = (goalTitle && goalTitle.trim()) ? goalTitle.trim() : ''
 
   if (isRegional) {
-    // Highly targeted regional language queries
-    queries.push(`${topic} in ${lang.name} tutorial`)
-    if (goalTitle && goalTitle.trim()) {
-      queries.push(`${goalTitle} ${topic} in ${lang.name}`)
+    // Highly targeted regional language queries — always include goal title for domain anchoring
+    if (goalAnchor) {
+      queries.push(`${goalAnchor} ${topic} ${lang.name} tutorial`)
     }
+    queries.push(`${topic} in ${lang.name} tutorial`)
     queries.push(`${topic} ${lang.name} full course`)
     if (lang.nativeName && lang.nativeName !== lang.name) {
-      queries.push(`${topic} ${lang.nativeName}`)
+      queries.push(`${goalAnchor ? goalAnchor + ' ' : ''}${topic} ${lang.nativeName}`)
     }
   } else {
-    // Highly authoritative English / Global queries
-    if (goalTitle && goalTitle.trim() && !topic.toLowerCase().includes(goalTitle.toLowerCase())) {
-      queries.push(`${goalTitle} ${topic} tutorial`)
+    // Highly authoritative English / Global queries — goal title ALWAYS prepended for disambiguation
+    if (goalAnchor && !topic.toLowerCase().includes(goalAnchor.toLowerCase())) {
+      queries.push(`${goalAnchor} ${topic} tutorial`)
+      queries.push(`${goalAnchor} ${topic} ${category || ''} explained`.trim())
     }
     queries.push(`${topic} ${category || ''} full tutorial`.trim())
     queries.push(`${topic} complete course masterclass`)
@@ -329,7 +354,8 @@ export async function searchYouTube(
       const clashPenalty = isClash ? -10.0 : 0.0
 
       const dur = c.durationSec
-      const durationScore = dur === 0 ? 0.3 : dur < 70 ? -0.5 : dur <= 2400 ? 0.4 : 0.15
+      // Strong anti-Shorts penalty: videos < 90s are almost certainly not tutorials
+      const durationScore = dur === 0 ? 0.3 : dur < 90 ? -5.0 : dur < 120 ? -1.0 : dur <= 2400 ? 0.4 : 0.15
       const viewScore = Math.min(0.3, Math.log10(c.views + 1) / 25)
       const positionScore = (12 - i) / 120
 
