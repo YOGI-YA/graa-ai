@@ -159,6 +159,26 @@ export async function POST(req: NextRequest) {
       }))
       .filter((d, i, arr) => arr.findIndex(x => x.day === d.day) === i)
 
+    // Ensure at least 1 milestone exists
+    if (cleanMilestones.length === 0) {
+      const distinctPhases = Array.from(new Set(cleanDays.map(d => d.phase).filter(Boolean))) as string[]
+      if (distinctPhases.length > 0) {
+        distinctPhases.forEach((phase, idx) => {
+          cleanMilestones.push({
+            title: phase.slice(0, 300),
+            description: `Master all concepts and competencies in ${phase}`,
+            order: idx + 1,
+          })
+        })
+      } else {
+        cleanMilestones.push({
+          title: 'Core Curriculum Mastery',
+          description: 'Master foundational and advanced syllabus topics',
+          order: 1,
+        })
+      }
+    }
+
     const effectiveDuration = cleanDays.length || roadmap.durationDays || 30
 
     // Build serializable planJson metadata

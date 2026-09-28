@@ -2,6 +2,7 @@ import mammoth from 'mammoth'
 import axios from 'axios'
 import zlib from 'zlib'
 import { logger } from './logger'
+import { nvidiaKeys } from './groq'
 
 function decodePdfString(raw: string): string {
   if (!raw) return ''
@@ -124,57 +125,94 @@ export function extractTextFromPdfPureNode(buffer: Buffer): string {
 }
 
 async function transcribeImageBufferWithVision(buffer: Buffer, mimeType: string): Promise<string> {
-  const nvidiaKey = process.env.NVIDIA_API_KEY
-  if (!nvidiaKey) {
-    logger.warn('CURRICULUM_PARSE', 'NVIDIA_API_KEY not configured for image OCR')
+  const keys = nvidiaKeys()
+  if (keys.length === 0) {
+    logger.warn('CURRICULUM_PARSE', 'No NVIDIA_API_KEY configured for image OCR')
     return ''
   }
 
   const base64Image = buffer.toString('base64')
   const dataUrl = `data:${mimeType};base64,${base64Image}`
 
-  try {
-    const response = await axios.post(
-      'https://integrate.api.nvidia.com/v1/chat/completions',
-      {
-        model: process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extract and transcribe all curriculum content, course titles, module/unit names, chapters, topics, subtopics, textbooks, and grading criteria from this syllabus document image. Format cleanly in markdown.',
-              },
-              {
-                type: 'image_url',
-                image_url: { url: dataUrl },
-              },
-            ],
-          },
-        ],
-        max_tokens: 3000,
-        temperature: 0.1,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${nvidiaKey}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+  for (const key of keys) {
+    try {
+      const response = await axios.post(
+        'https://integrate.api.nvidia.com/v1/chat/completions',
+        {
+          model: process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Extract and transcribe all curriculum content, course titles, module/unit names, chapters, topics, subtopics, textbooks, and grading criteria from this syllabus document image. Format cleanly in markdown.',
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: dataUrl },
+                },
+              ],
+            },
+          ],
+          max_tokens: 3000,
+          temperature: 0.1,
         },
-        timeout: 45000,
-      }
-    )
+        {
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          timeout: 45000,
+        }
+      )
 
-    return response.data?.choices?.[0]?.message?.content?.trim() || ''
-  } catch (err) {
-    logger.error('CURRICULUM_PARSE', 'Vision OCR extraction error', err)
-    return ''
+      const result = response.data?.choices?.[0]?.message?.content?.trim()
+      if (result) return result
+    } catch (err) {
+      logger.warn('CURRICULUM_PARSE', 'Vision OCR key failed, trying next key if available', {
+        err: err instanceof Error ? err.message : String(err),
+      })
+      continue
+    }
   }
+
+  return ''
 }
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  // Method 1: High-performance pure Node.js FlateDecode stream extractor (works on all PDF sizes without worker limits)
+  // Method 1: PDFParse library class (Mozilla pdf.js engine - full font, layout, unicode support)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfModule = require('pdf-parse')
+    const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || (typeof pdfModule === 'function' ? pdfModule : null)
+    if (PDFParse) {
+      if (typeof PDFParse === 'function' && PDFParse.prototype?.getText) {
+        const parser = new PDFParse({ data: buffer })
+        const result = await parser.getText()
+        if (typeof parser.destroy === 'function') {
+          await parser.destroy().catch(() => {})
+        }
+        const text = (typeof result === 'string' ? result : result?.text || '').trim()
+        if (text.length >= 20) {
+          logger.info('CURRICULUM_PARSE', 'Extracted text via PDFParse engine', { charCount: text.length })
+          return text
+        }
+      } else if (typeof PDFParse === 'function') {
+        const data = await PDFParse(buffer).catch(() => null)
+        const text = (typeof data?.text === 'string' ? data.text : '').trim()
+        if (text.length >= 20) {
+          logger.info('CURRICULUM_PARSE', 'Extracted text via pdf-parse function', { charCount: text.length })
+          return text
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('CURRICULUM_PARSE', 'PDFParse engine extraction failed, trying pure Node stream extractor', { err: String(err) })
+  }
+
+  // Method 2: High-performance pure Node.js FlateDecode stream extractor
   try {
     const streamText = extractTextFromPdfPureNode(buffer)
     if (streamText && streamText.length >= 20) {
@@ -185,46 +223,10 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
       return streamText
     }
   } catch (err) {
-    logger.warn('CURRICULUM_PARSE', 'Pure Node PDF stream extraction failed, trying pdf-parse', { err: String(err) })
+    logger.warn('CURRICULUM_PARSE', 'Pure Node PDF stream extraction failed, trying Vision AI OCR', { err: String(err) })
   }
 
-  // Method 2: PDFParse library class
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfModule = require('pdf-parse')
-    const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || (typeof pdfModule === 'function' ? null : pdfModule)
-    if (PDFParse && typeof PDFParse === 'function') {
-      const parser = new PDFParse({ data: buffer })
-      const result = await parser.getText().catch(() => null)
-      if (typeof parser.destroy === 'function') {
-        await parser.destroy().catch(() => {})
-      }
-      if (result && typeof result.text === 'string' && result.text.trim().length >= 20) {
-        logger.info('CURRICULUM_PARSE', 'Extracted text via PDFParse library', { charCount: result.text.length })
-        return result.text.trim()
-      }
-    }
-  } catch (err) {
-    logger.warn('CURRICULUM_PARSE', 'PDFParse class extraction failed', { err: String(err) })
-  }
-
-  // Method 3: Legacy pdf-parse function call
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdf = require('pdf-parse')
-    const fn = typeof pdf === 'function' ? pdf : pdf.default
-    if (typeof fn === 'function') {
-      const data = await fn(buffer).catch(() => null)
-      if (data && typeof data.text === 'string' && data.text.trim().length >= 20) {
-        logger.info('CURRICULUM_PARSE', 'Extracted text via legacy pdf-parse', { charCount: data.text.length })
-        return data.text.trim()
-      }
-    }
-  } catch (err) {
-    logger.warn('CURRICULUM_PARSE', 'Legacy pdf-parse function failed', { err: String(err) })
-  }
-
-  // Method 4: If text is sparse or document is an image scan, pass to Vision AI OCR
+  // Method 3: If text is sparse or document is an image scan, pass to Vision AI OCR
   try {
     const visionText = await transcribeImageBufferWithVision(buffer, 'image/png')
     if (visionText && visionText.length >= 20) {

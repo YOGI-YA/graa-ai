@@ -79,7 +79,7 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
+         {/**<button
               type="button"
               onClick={() => setShowCurriculumUpload(true)}
               className="text-xs px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 flex items-center gap-1.5 transition-all"
@@ -87,6 +87,7 @@ export default function NewGoalModal({ onClose, onCreated }: { onClose: () => vo
               <UploadCloud size={13} />
               Upload Syllabus
             </button>
+         */}
             <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
               <X size={18} />
             </button>

@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   X,
   UploadCloud,
@@ -31,6 +32,7 @@ export default function CurriculumUploadModal({
   onClose: () => void
   onCreated: (goal: Goal) => void
 }) {
+  const router = useRouter()
   const { t, language } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -145,6 +147,7 @@ export default function CurriculumUploadModal({
       if (data.goal) {
         notify('Curriculum roadmap generated successfully!', 'success')
         onCreated(data.goal)
+        router.push(`/goals/${data.goal.id}`)
         return
       }
 
@@ -172,6 +175,7 @@ export default function CurriculumUploadModal({
 
       notify('Curriculum roadmap generated successfully!', 'success')
       onCreated(goalData.goal)
+      router.push(`/goals/${goalData.goal.id}`)
     } catch (err) {
       console.error(err)
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')

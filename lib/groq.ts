@@ -25,12 +25,6 @@ function ensureEnvLoaded() {
 }
 ensureEnvLoaded()
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b'
-
-const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
-const NVIDIA_MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct'
-
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -42,100 +36,384 @@ interface GroqChatResponse {
       content?: string
       reasoning?: string
     }
+    delta?: {
+      content?: string
+    }
   }>
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-export function groqKeys(): string[] {
+// In-memory health and rate-limit cooldown tracking
+const keyCooldowns = new Map<string, number>()
+const providerRoundRobin = new Map<string, number>()
+
+function isKeyHealthy(provider: string, key: string): boolean {
+  const id = `${provider}:${key}`
+  const cooldownUntil = keyCooldowns.get(id)
+  if (!cooldownUntil) return true
+  if (Date.now() > cooldownUntil) {
+    keyCooldowns.delete(id)
+    return true
+  }
+  return false
+}
+
+function markKeyCooldown(provider: string, key: string, cooldownMs: number) {
+  const id = `${provider}:${key}`
+  keyCooldowns.set(id, Date.now() + cooldownMs)
+}
+
+function collectKeysFromEnv(patterns: RegExp[]): string[] {
   ensureEnvLoaded()
-  return Object.entries(process.env)
-    .filter(([k, v]) => /^GROQ_API_KEY.*$/i.test(k) && Boolean(v))
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, v]) => v as string)
-    .filter((k, i, arr) => arr.indexOf(k) === i)
-}
-
-// Order models by high TPM limits and fast JSON output
-function modelChain(primary: string): string[] {
-  return [primary, 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b'].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
-}
-
-async function tryGroq(
-  messages: ChatMessage[],
-  options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
-): Promise<string | null> {
-  const keys = options.apiKey ? [options.apiKey] : groqKeys()
-  if (keys.length === 0) return null
-  const models = modelChain(options.model || DEFAULT_MODEL)
-
-  for (let round = 0; round < 3; round++) {
-    for (const model of models) {
-      const maxTokens = Math.min(options.maxTokens || 4000, 4096)
-      for (const key of keys) {
-        try {
-          const response = await axios.post<GroqChatResponse>(
-            GROQ_URL,
-            { model, messages, max_tokens: maxTokens, temperature: options.temperature, top_p: 0.95, stream: false },
-            { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } }
-          )
-          const content = response.data.choices?.[0]?.message?.content?.trim()
-          if (content) return content
-        } catch (err) {
-          const status = axios.isAxiosError(err) ? err.response?.status : undefined
-          if (status === 429 || status === 404 || status === 400 || (status && status >= 500)) continue // try next key / model
-          console.error('Groq error', status, axios.isAxiosError(err) ? err.response?.data : err)
-          continue
-        }
-      }
+  const found: string[] = []
+  for (const [k, v] of Object.entries(process.env)) {
+    if (!v || typeof v !== 'string' || !v.trim()) continue
+    if (patterns.some(p => p.test(k))) {
+      found.push(v.trim())
     }
-    await sleep(1200 * (round + 1))
   }
-  return null // all Groq attempts rate-limited
+  return Array.from(new Set(found))
 }
 
-async function tryNvidia(
-  messages: ChatMessage[],
-  options: { maxTokens: number; temperature: number }
-): Promise<string | null> {
-  const key = process.env.NVIDIA_API_KEY
-  if (!key) return null
-  try {
-    const response = await axios.post<GroqChatResponse>(
-      NVIDIA_URL,
-      { model: NVIDIA_MODEL, messages, max_tokens: Math.min(options.maxTokens, 2048), temperature: options.temperature, top_p: 0.95, stream: false },
-      { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' } }
-    )
-    return response.data.choices?.[0]?.message?.content?.trim() || ''
-  } catch (err) {
-    console.error('NVIDIA fallback failed', axios.isAxiosError(err) ? err.response?.status : err)
-    return null
-  }
+export function groqKeys(): string[] {
+  return collectKeysFromEnv([/^GROQ_API_KEY.*$/i, /^GROQ_KEY.*$/i, /^GROQ_TOKEN.*$/i])
 }
 
-async function createChatCompletion(
+export function nvidiaKeys(): string[] {
+  return collectKeysFromEnv([/^NVIDIA_API_KEY.*$/i, /^NVIDIA_KEY.*$/i, /^NVIDIA_NIM_KEY.*$/i])
+}
+
+export function openrouterKeys(): string[] {
+  return collectKeysFromEnv([/^OPENROUTER_API_KEY.*$/i, /^OPENROUTER_KEY.*$/i])
+}
+
+export function cerebrasKeys(): string[] {
+  return collectKeysFromEnv([/^CEREBRAS_API_KEY.*$/i, /^CEREBRAS_KEY.*$/i])
+}
+
+export function sambanovaKeys(): string[] {
+  return collectKeysFromEnv([/^SAMBANOVA_API_KEY.*$/i, /^SAMBANOVA_KEY.*$/i])
+}
+
+export function togetherKeys(): string[] {
+  return collectKeysFromEnv([/^TOGETHER_API_KEY.*$/i, /^TOGETHERAI_API_KEY.*$/i])
+}
+
+export function deepseekKeys(): string[] {
+  return collectKeysFromEnv([/^DEEPSEEK_API_KEY.*$/i, /^DEEPSEEK_KEY.*$/i])
+}
+
+export function geminiKeys(): string[] {
+  return collectKeysFromEnv([/^GEMINI_API_KEY.*$/i, /^GOOGLE_API_KEY.*$/i, /^GOOGLE_AI_KEY.*$/i])
+}
+
+export function openaiKeys(): string[] {
+  return collectKeysFromEnv([/^OPENAI_API_KEY.*$/i, /^OPENAI_KEY.*$/i])
+}
+
+export interface ProviderEndpoint {
+  name: string
+  url: string
+  keys: string[]
+  models: string[]
+  maxTokensCap: number
+  headers?: (key: string) => Record<string, string>
+}
+
+export function getAllConfiguredProviders(customModel?: string): ProviderEndpoint[] {
+  const providers: ProviderEndpoint[] = []
+
+  // 1. Groq (Primary ultra-fast inference)
+  const gKeys = groqKeys()
+  if (gKeys.length > 0) {
+    const groqModels = [
+      customModel || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+      'openai/gpt-oss-20b',
+      'openai/gpt-oss-120b',
+      'qwen/qwen3.8-27b',
+    ].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
+
+    providers.push({
+      name: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      keys: gKeys,
+      models: groqModels,
+      maxTokensCap: 4096,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 2. NVIDIA NIM (High quality fallback)
+  const nKeys = nvidiaKeys()
+  if (nKeys.length > 0) {
+    const nvidiaModels = [
+      process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct',
+      'meta/llama-3.3-70b-instruct',
+      'meta/llama-3.1-70b-instruct',
+      'meta/llama-3.1-8b-instruct',
+      'mistralai/mixtral-8x22b-instruct-v0.1',
+      'nvidia/llama-3.1-nemotron-70b-instruct',
+      'meta/llama-3.2-11b-vision-instruct',
+    ].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
+
+    providers.push({
+      name: 'NVIDIA',
+      url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+      keys: nKeys,
+      models: nvidiaModels,
+      maxTokensCap: 2048,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+    })
+  }
+
+  // 3. OpenRouter (Multi-model aggregator)
+  const orKeys = openrouterKeys()
+  if (orKeys.length > 0) {
+    providers.push({
+      name: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      keys: orKeys,
+      models: [
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemini-2.0-flash-exp:free',
+        'mistralai/mistral-7b-instruct:free',
+        'deepseek/deepseek-chat',
+      ],
+      maxTokensCap: 4000,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://graa.ai',
+        'X-Title': 'Graa AI',
+      }),
+    })
+  }
+
+  // 4. Cerebras (Ultra-low latency inference)
+  const cKeys = cerebrasKeys()
+  if (cKeys.length > 0) {
+    providers.push({
+      name: 'Cerebras',
+      url: 'https://api.cerebras.ai/v1/chat/completions',
+      keys: cKeys,
+      models: ['llama3.3-70b', 'llama3.1-8b'],
+      maxTokensCap: 4096,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 5. SambaNova
+  const snKeys = sambanovaKeys()
+  if (snKeys.length > 0) {
+    providers.push({
+      name: 'SambaNova',
+      url: 'https://api.sambanova.ai/v1/chat/completions',
+      keys: snKeys,
+      models: ['Meta-Llama-3.3-70B-Instruct', 'Meta-Llama-3.1-8B-Instruct'],
+      maxTokensCap: 4096,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 6. Together AI
+  const tgKeys = togetherKeys()
+  if (tgKeys.length > 0) {
+    providers.push({
+      name: 'TogetherAI',
+      url: 'https://api.together.xyz/v1/chat/completions',
+      keys: tgKeys,
+      models: ['meta-llama/Llama-3.3-70B-Instruct-Turbo', 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'],
+      maxTokensCap: 4000,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 7. DeepSeek
+  const dsKeys = deepseekKeys()
+  if (dsKeys.length > 0) {
+    providers.push({
+      name: 'DeepSeek',
+      url: 'https://api.deepseek.com/chat/completions',
+      keys: dsKeys,
+      models: ['deepseek-chat'],
+      maxTokensCap: 4000,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 8. Google Gemini (OpenAI compatible endpoint)
+  const gemKeys = geminiKeys()
+  if (gemKeys.length > 0) {
+    providers.push({
+      name: 'GoogleGemini',
+      url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      keys: gemKeys,
+      models: ['gemini-2.0-flash', 'gemini-1.5-flash'],
+      maxTokensCap: 4000,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  // 9. OpenAI
+  const oKeys = openaiKeys()
+  if (oKeys.length > 0) {
+    providers.push({
+      name: 'OpenAI',
+      url: 'https://api.openai.com/v1/chat/completions',
+      keys: oKeys,
+      models: ['gpt-4o-mini', 'gpt-3.5-turbo'],
+      maxTokensCap: 4000,
+      headers: (key: string) => ({
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      }),
+    })
+  }
+
+  return providers
+}
+
+function getBalancedKeys(providerName: string, keys: string[]): string[] {
+  if (keys.length <= 1) return keys
+  const idx = providerRoundRobin.get(providerName) || 0
+  providerRoundRobin.set(providerName, (idx + 1) % keys.length)
+
+  const reordered: string[] = []
+  for (let i = 0; i < keys.length; i++) {
+    reordered.push(keys[(idx + i) % keys.length])
+  }
+
+  // Prioritize healthy keys (not on cooldown)
+  return reordered.sort((a, b) => {
+    const aHealthy = isKeyHealthy(providerName, a)
+    const bHealthy = isKeyHealthy(providerName, b)
+    if (aHealthy && !bHealthy) return -1
+    if (!aHealthy && bHealthy) return 1
+    return 0
+  })
+}
+
+export async function createChatCompletion(
   messages: ChatMessage[],
   options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
 ): Promise<string> {
-  const groq = await tryGroq(messages, options)
-  if (groq !== null) return groq
+  const providers = getAllConfiguredProviders(options.model)
 
-  const nvidia = await tryNvidia(messages, options)
-  if (nvidia !== null) return nvidia
+  if (providers.length === 0) {
+    throw new Error('No AI provider API key is configured. Please add GROQ_API_KEY or NVIDIA_API_KEY to .env.')
+  }
 
-  throw new Error('The AI is busy right now (all free-tier providers are rate-limited). Please try again in a bit.')
+  // Allow custom override key if explicitly passed
+  if (options.apiKey) {
+    providers[0].keys = [options.apiKey]
+  }
+
+  // Try up to 3 overall rounds across all providers
+  for (let round = 0; round < 3; round++) {
+    for (const provider of providers) {
+      const keys = getBalancedKeys(provider.name, provider.keys)
+      const maxTokens = Math.min(options.maxTokens || 4000, provider.maxTokensCap || 4096)
+
+      for (const model of provider.models) {
+        for (const key of keys) {
+          // If on cooldown and we're not on the final desperation round, skip to next healthy key
+          if (!isKeyHealthy(provider.name, key) && round < 2) {
+            continue
+          }
+
+          try {
+            const headers = provider.headers ? provider.headers(key) : { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+            const response = await axios.post<GroqChatResponse>(
+              provider.url,
+              {
+                model,
+                messages,
+                max_tokens: maxTokens,
+                temperature: options.temperature,
+                top_p: 0.95,
+                stream: false,
+              },
+              {
+                headers,
+                timeout: 30000,
+              }
+            )
+
+            const content = response.data.choices?.[0]?.message?.content?.trim()
+            if (content) {
+              return content
+            }
+          } catch (err: any) {
+            const status = axios.isAxiosError(err) ? err.response?.status : undefined
+
+            if (status === 429) {
+              // Rate limited -> cooldown for 35 seconds
+              markKeyCooldown(provider.name, key, 35000)
+              continue
+            } else if (status === 401 || status === 403) {
+              // Invalid key / quota exhausted -> cooldown for 5 minutes
+              markKeyCooldown(provider.name, key, 300000)
+              continue
+            } else if (status === 400 || status === 404) {
+              // Model error / incompatible params -> try next model
+              continue
+            } else if (status && status >= 500) {
+              // Provider error -> cooldown for 15 seconds
+              markKeyCooldown(provider.name, key, 15000)
+              continue
+            }
+            continue
+          }
+        }
+      }
+    }
+
+    if (round < 2) {
+      // Exponential backoff before re-checking all providers
+      await sleep(1000 * (round + 1))
+    }
+  }
+
+  throw new Error('All AI inference providers are currently busy or rate-limited. Please try again in a few moments.')
 }
 
 export interface MilestoneItem {
   title: string
   description: string
-  dueDate?: string
+  dueDate?: string | null
   order: number
 }
 
 export interface ResourceItem {
   title: string
-  url?: string
+  url?: string | null
   type: string
 }
 
@@ -296,6 +574,68 @@ function parseRoadmapJson(content: string): RoadmapDraft {
   }
 }
 
+function normalizeDraft(raw: any, targetDays: number | null): RoadmapDraft {
+  const milestones: MilestoneItem[] = Array.isArray(raw?.milestones)
+    ? raw.milestones
+        .filter((m: any) => m && (typeof m.title === 'string' || typeof m.name === 'string'))
+        .map((m: any, i: number) => ({
+          title: (m.title || m.name || `Milestone ${i + 1}`).trim().slice(0, 300),
+          description: (typeof m.description === 'string' ? m.description.trim() : '').slice(0, 2000),
+          dueDate: m.dueDate || null,
+          order: typeof m.order === 'number' ? m.order : i + 1,
+        }))
+    : []
+
+  const resources: ResourceItem[] = Array.isArray(raw?.resources)
+    ? raw.resources
+        .filter((r: any) => r && (typeof r.title === 'string' || typeof r.name === 'string'))
+        .map((r: any) => ({
+          title: (r.title || r.name || 'Learning Resource').trim().slice(0, 300),
+          url: typeof r.url === 'string' && r.url.startsWith('http') ? r.url.slice(0, 500) : null,
+          type: typeof r.type === 'string' ? r.type : 'article',
+        }))
+    : []
+
+  const rawDays = Array.isArray(raw?.days) ? raw.days : []
+  const days: DailyTaskItem[] = rawDays
+    .filter((d: any) => d && (typeof d.title === 'string' || typeof d.topic === 'string'))
+    .map((d: any, index: number) => ({
+      day: typeof d.day === 'number' && d.day > 0 ? d.day : index + 1,
+      week: typeof d.week === 'number' ? d.week : Math.floor(index / 7) + 1,
+      phase: typeof d.phase === 'string' && d.phase.trim() ? d.phase.trim() : (milestones[Math.floor(index / Math.max(1, Math.ceil(rawDays.length / Math.max(1, milestones.length))))]?.title || 'Phase 1'),
+      title: (d.title || d.topic || `Day ${index + 1}`).trim().slice(0, 300),
+      description: (typeof d.description === 'string' ? d.description.trim() : '').slice(0, 2000),
+      type: typeof d.type === 'string' ? d.type : 'lesson',
+    }))
+    .filter((d: DailyTaskItem, i: number, arr: DailyTaskItem[]) => arr.findIndex(x => x.day === d.day) === i)
+    .sort((a: DailyTaskItem, b: DailyTaskItem) => a.day - b.day)
+
+  // Deduplicate near-identical day titles (case-insensitive exact match)
+  const seenTitles = new Map<string, number>()
+  for (const day of days) {
+    const key = day.title.toLowerCase().trim()
+    if (seenTitles.has(key)) {
+      day.title = `${day.title} (Part 2)`
+    }
+    seenTitles.set(key, day.day)
+  }
+
+  const inferredDuration = targetDays || clampDuration(raw?.durationDays) || (days.length > 0 ? days.length : 30)
+
+  return {
+    title: typeof raw?.title === 'string' && raw.title.trim() ? raw.title.trim().slice(0, 300) : 'Learning Roadmap',
+    description: typeof raw?.description === 'string' && raw.description.trim() ? raw.description.trim().slice(0, 3000) : 'Custom day-by-day learning roadmap.',
+    category: typeof raw?.category === 'string' && raw.category.trim() ? raw.category.trim().slice(0, 100) : 'Programming',
+    targetDate: raw?.targetDate || null,
+    durationDays: inferredDuration,
+    skillLevel: typeof raw?.skillLevel === 'string' && raw.skillLevel.trim() ? raw.skillLevel.trim() : 'beginner',
+    milestones: milestones.length > 0 ? milestones : [{ title: 'Fundamentals & Setup', description: 'Core initial concepts', dueDate: null, order: 1 }],
+    resources,
+    days,
+    advice: typeof raw?.advice === 'string' && raw.advice.trim() ? raw.advice.trim().slice(0, 2000) : 'Follow the daily progression consistently to achieve mastery.',
+  }
+}
+
 export async function generateRoadmapDraft(
   prompt: string,
   existingRoadmap?: RoadmapDraft,
@@ -386,12 +726,48 @@ Generate exactly 4-6 milestones and 3-5 resources. The "days" array must cover t
 
   const draft = normalizeDraft(parseRoadmapJson(content), durationDays)
 
- 
   if (durationDays && (draft.days?.length ?? 0) < durationDays) {
     draft.days = await fillMissingDays(draft, durationDays, { apiKey, model, language })
   }
 
   return draft
+}
+
+export function analyzeCurriculumStructure(curriculumText: string): {
+  suggestedDuration: number
+  unitCount: number
+  topicCount: number
+  summary: string
+} {
+  const unitMatches = curriculumText.match(/(?:unit|module|chapter|section|part|paper|block|week|theme)\s*[-:–]?\s*([0-9ivxlcdm]+|[a-f])/gi) || []
+  const unitCount = Math.max(1, unitMatches.length)
+
+  const topicMatches = curriculumText.match(/(?:^\s*(?:[0-9]+\.[0-9]+|[0-9]+\.|\*|-|•)\s+[A-Za-z0-9])/gm) || []
+  const meaningfulLines = curriculumText
+    .split(/\n+/)
+    .map(l => l.trim())
+    .filter(l => l.length > 10 && l.length < 150 && !l.startsWith('Page') && !l.includes('http'))
+  const topicCount = Math.max(topicMatches.length, Math.round(meaningfulLines.length * 0.4))
+
+  const wordCount = curriculumText.trim().split(/\s+/).filter(Boolean).length
+
+  let suggestedDuration = 30
+  if (unitCount >= 7 || topicCount >= 45 || wordCount > 5000) {
+    suggestedDuration = Math.min(75, Math.max(45, Math.round(unitCount * 7 + topicCount * 0.35)))
+  } else if (unitCount >= 4 || topicCount >= 22 || wordCount > 2000) {
+    suggestedDuration = Math.min(45, Math.max(28, Math.round(unitCount * 6 + topicCount * 0.45)))
+  } else if (unitCount >= 2 || topicCount >= 10 || wordCount > 800) {
+    suggestedDuration = Math.min(28, Math.max(18, Math.round(unitCount * 5 + topicCount * 0.55)))
+  } else {
+    suggestedDuration = Math.min(14, Math.max(10, Math.round(Math.max(7, topicCount * 0.75))))
+  }
+
+  return {
+    suggestedDuration: clampDuration(suggestedDuration) || 30,
+    unitCount,
+    topicCount,
+    summary: `${unitCount} units/modules, ~${topicCount} topics detected across ${wordCount} words`,
+  }
 }
 
 export async function generateRoadmapFromCurriculum(
@@ -400,12 +776,15 @@ export async function generateRoadmapFromCurriculum(
   options: RoadmapOptions = {}
 ): Promise<RoadmapDraft> {
   const { skillLevel, apiKey, model, language } = options
-  const durationDays = clampDuration(options.durationDays)
+  const userDuration = clampDuration(options.durationDays)
   const langInstruction = getLanguageInstruction(language)
 
-  const durationLine = durationDays
-    ? `Target duration requested by user: ${durationDays} days. Distribute the curriculum topics into exactly ${durationDays} daily progression units (day 1 through ${durationDays}) and set "durationDays" to ${durationDays}.`
-    : `Infer an optimal curriculum duration (between ${MIN_DURATION_DAYS} and ${MAX_DURATION_DAYS} days) based on the syllabus volume and depth. Set "durationDays" to this number and generate a day entry for every day.`
+  const analysis = analyzeCurriculumStructure(curriculumText)
+  const targetDaysCount = userDuration || analysis.suggestedDuration
+
+  const durationLine = userDuration
+    ? `Target duration requested by user: ${userDuration} days. Distribute all syllabus topics into exactly ${userDuration} daily progression units (day 1 through ${userDuration}) and set "durationDays" to ${userDuration}.`
+    : `Syllabus density analysis: ${analysis.summary}. Set "durationDays" to exactly ${analysis.suggestedDuration} days and generate a distinct daily progression entry for each day.`
 
   const prompt = `You are an elite academic curriculum architect and learning coach.
 You have been provided with an uploaded curriculum / syllabus document.
@@ -414,7 +793,7 @@ Deeply analyze this curriculum, extracting all core units, chapters, learning ou
 
 UPLOADED CURRICULUM TEXT:
 """
-${curriculumText.slice(0, 18000)}
+${curriculumText.slice(0, 28000)}
 """
 
 ${learningStyle ? `Learner style: ${learningStyle}` : ''}
@@ -423,21 +802,21 @@ ${langInstruction ? `${langInstruction}` : ''}
 ${durationLine}
 
 INSTRUCTIONS:
-1. "title": Extract or infer a crisp, professional course/goal title directly from the curriculum.
-2. "description": 2-3 sentence summary of the curriculum scope and target learning outcomes.
+1. "title": Extract the authentic course/subject title directly from the curriculum (e.g. "Data Structures and Algorithms", "Organic Chemistry I", "Operating Systems", etc.). Do NOT use generic names.
+2. "description": 2-3 sentence summary of the curriculum scope, pre-requisites, and target learning outcomes.
 3. "category": Choose the best matching category (Programming, Data Science, Design, Language, Business, Mathematics, Science, Arts, Health, Other).
 4. "milestones": Map the syllabus's main Units / Modules / Chapters into 4-8 ordered milestones with detailed descriptions.
-5. "resources": Extract any referenced textbooks, reference guides, websites, or tools mentioned in the syllabus.
+5. "resources": Extract any referenced textbooks, reference books, websites, or tools mentioned in the syllabus.
 6. "days": Sequence every subtopic logically day by day. Every single day must have a UNIQUE, SPECIFIC focused title matching the curriculum — NO duplicate or vague topics. Progress from foundational to advanced.
-7. "advice": Personalized coaching advice on how to study and master this specific syllabus.
+7. "advice": Personalized coaching strategy on how to study and master this specific syllabus.
 
 Respond ONLY with a valid JSON object in the exact format:
 {
-  "title": "Curriculum / Course Title",
+  "title": "Exact Curriculum Title",
   "description": "Comprehensive outcome description",
   "category": "Programming|Data Science|Design|Language|Business|Mathematics|Science|Arts|Health|Other",
   "targetDate": null,
-  "durationDays": ${durationDays ?? 'an optimal integer between 7 and 90'},
+  "durationDays": ${targetDaysCount},
   "skillLevel": ${skillLevel ? `"${skillLevel}"` : '"beginner|intermediate|advanced"'},
   "milestones": [
     {
@@ -474,10 +853,11 @@ Respond ONLY with a valid JSON object in the exact format:
     model,
   })
 
-  const draft = normalizeDraft(parseRoadmapJson(content), durationDays)
+  const rawParsed = parseRoadmapJson(content)
+  const draft = normalizeDraft(rawParsed, targetDaysCount)
 
-  if (durationDays && (draft.days?.length ?? 0) < durationDays) {
-    draft.days = await fillMissingDays(draft, durationDays, { apiKey, model, language })
+  if (targetDaysCount && (draft.days?.length ?? 0) < targetDaysCount) {
+    draft.days = await fillMissingDays(draft, targetDaysCount, { apiKey, model, language })
   }
 
   return draft
@@ -559,38 +939,6 @@ async function fillMissingDays(
     if (days.length === before) break 
   }
   return days
-}
-
-function normalizeDraft(draft: RoadmapDraft, requestedDuration: number | null): RoadmapDraft {
-  const days = Array.isArray(draft.days) ? draft.days : []
-  const normalizedDays = days
-    .filter(d => d && typeof d.title === 'string')
-    .map((d, i) => ({
-      day: typeof d.day === 'number' && d.day > 0 ? d.day : i + 1,
-      week: typeof d.week === 'number' ? d.week : Math.floor(i / 7) + 1,
-      phase: typeof d.phase === 'string' ? d.phase : undefined,
-      title: d.title,
-      description: typeof d.description === 'string' ? d.description : '',
-      type: typeof d.type === 'string' ? d.type : 'lesson',
-    }))
-    .sort((a, b) => a.day - b.day)
-
-  // Deduplicate near-identical day titles (case-insensitive exact match)
-  const seenTitles = new Map<string, number>()
-  for (const day of normalizedDays) {
-    const key = day.title.toLowerCase().trim()
-    if (seenTitles.has(key)) {
-      // Append day number to disambiguate duplicate titles
-      day.title = `${day.title} (Day ${day.day})`
-    }
-    seenTitles.set(key, day.day)
-  }
-
-  return {
-    ...draft,
-    durationDays: requestedDuration ?? clampDuration(draft.durationDays) ?? (normalizedDays.length || null),
-    days: normalizedDays,
-  }
 }
 
 export async function analyzeGoalAndGenerateMilestones(
@@ -1015,29 +1363,56 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
     stream: true,
   })
 
-  // Build the attempt list: every Groq model × key, then NVIDIA as a final fallback.
-  const attempts: { url: string; key: string; model: string }[] = []
-  for (const model of modelChain(options.model || DEFAULT_MODEL)) {
-    for (const key of keys) attempts.push({ url: GROQ_URL, key, model })
+  const providers = getAllConfiguredProviders(options.model)
+  if (options.apiKey && providers.length > 0) {
+    providers[0].keys = [options.apiKey]
   }
-  if (process.env.NVIDIA_API_KEY) {
-    attempts.push({ url: NVIDIA_URL, key: process.env.NVIDIA_API_KEY, model: NVIDIA_MODEL })
-  }
-  if (attempts.length === 0) throw new Error('No AI provider is configured')
+  if (providers.length === 0) throw new Error('No AI provider is configured')
 
   let upstream: Response | null = null
-  for (const a of attempts) {
-    let res: Response
-    try {
-      res = await fetch(a.url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${a.key}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: body(a.model),
-      })
-    } catch { continue }
-    if (res.ok && res.body) { upstream = res; break }
-    if (res.status !== 429 && res.status < 500) continue // try next provider/model
+
+  for (let round = 0; round < 2 && !upstream; round++) {
+    for (const provider of providers) {
+      const keys = getBalancedKeys(provider.name, provider.keys)
+      for (const model of provider.models) {
+        for (const key of keys) {
+          if (!isKeyHealthy(provider.name, key) && round === 0) {
+            continue
+          }
+
+          try {
+            const headers = provider.headers ? provider.headers(key) : { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+            const res = await fetch(provider.url, {
+              method: 'POST',
+              headers: {
+                ...headers,
+                Accept: 'text/event-stream',
+              },
+              body: body(model),
+            })
+
+            if (res.ok && res.body) {
+              upstream = res
+              break
+            }
+
+            if (res.status === 429) {
+              markKeyCooldown(provider.name, key, 35000)
+            } else if (res.status === 401 || res.status === 403) {
+              markKeyCooldown(provider.name, key, 300000)
+            } else if (res.status >= 500) {
+              markKeyCooldown(provider.name, key, 15000)
+            }
+          } catch {
+            continue
+          }
+        }
+        if (upstream) break
+      }
+      if (upstream) break
+    }
   }
+
   if (!upstream || !upstream.body) {
     throw new Error('The AI mentor is busy right now. Please try again in a moment.')
   }

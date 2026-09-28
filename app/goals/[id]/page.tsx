@@ -50,7 +50,7 @@ async function getGoal(id: string, userId: string): Promise<Goal | null> {
           url: true,
           completed: true,
         },
-        orderBy: [{ week: 'asc' }, { day: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [{ day: 'asc' }],
       },
     },
   })
