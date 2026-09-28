@@ -331,6 +331,13 @@ ${skillLevel ? `Skill level: ${skillLevel}` : ''}
 ${langInstruction ? `${langInstruction}` : ''}
 ${durationLine}
 
+CRITICAL RULES:
+- Every day must cover a UNIQUE, SPECIFIC subtopic — never repeat topics across days.
+- Days must progress from foundational concepts to advanced application (progressive difficulty).
+- Use concrete, precise topic titles like "Array Sorting Algorithms" NOT vague ones like "Continue learning".
+- Include a healthy mix of lesson, practice, review, and project days.
+- Milestones should represent meaningful skill checkpoints, not arbitrary groupings.
+
 Respond ONLY with a valid JSON object in the exact format below. Infer a concise title, useful category, and realistic milestones.`
 
   const content = await createChatCompletion([{ role: 'user', content: `${roadmapPrompt}
@@ -370,9 +377,9 @@ Respond ONLY with a valid JSON object in the exact format below. Infer a concise
   "advice": "2-3 sentences of personalized coaching advice"
 }
 
-Generate exactly 4-6 milestones and 3-5 resources. The "days" array must cover the daily progression in order.` }], {
+Generate exactly 4-6 milestones and 3-5 resources. The "days" array must cover the daily progression in order. Every day title must be UNIQUE — never repeat the same topic.` }], {
     temperature: 0.6,
-    maxTokens: 5000,
+    maxTokens: 6000,
     apiKey,
     model,
   })
@@ -407,7 +414,7 @@ Deeply analyze this curriculum, extracting all core units, chapters, learning ou
 
 UPLOADED CURRICULUM TEXT:
 """
-${curriculumText.slice(0, 14000)}
+${curriculumText.slice(0, 18000)}
 """
 
 ${learningStyle ? `Learner style: ${learningStyle}` : ''}
@@ -421,7 +428,7 @@ INSTRUCTIONS:
 3. "category": Choose the best matching category (Programming, Data Science, Design, Language, Business, Mathematics, Science, Arts, Health, Other).
 4. "milestones": Map the syllabus's main Units / Modules / Chapters into 4-8 ordered milestones with detailed descriptions.
 5. "resources": Extract any referenced textbooks, reference guides, websites, or tools mentioned in the syllabus.
-6. "days": Sequence every subtopic logically day by day. Every single day must have a focused title matching the curriculum, a 1-sentence focus description, and a type ("lesson", "practice", "review", or "project").
+6. "days": Sequence every subtopic logically day by day. Every single day must have a UNIQUE, SPECIFIC focused title matching the curriculum — NO duplicate or vague topics. Progress from foundational to advanced.
 7. "advice": Personalized coaching advice on how to study and master this specific syllabus.
 
 Respond ONLY with a valid JSON object in the exact format:
@@ -462,7 +469,7 @@ Respond ONLY with a valid JSON object in the exact format:
 
   const content = await createChatCompletion([{ role: 'user', content: prompt }], {
     temperature: 0.5,
-    maxTokens: 3000,
+    maxTokens: 5000,
     apiKey,
     model,
   })
@@ -485,6 +492,7 @@ async function generateDayRange(
 ): Promise<DailyTaskItem[]> {
   const phases = draft.milestones.map((m, i) => `${i + 1}. ${m.title}`).join('\n')
   const langInstruction = getLanguageInstruction(opts.language)
+  const existingTitles = draft.days?.map(d => d.title).filter(Boolean).join(', ') || ''
   const prompt = `Continue an existing day-by-day learning plan.
 
 Goal: ${draft.title}
@@ -494,7 +502,9 @@ ${langInstruction ? `${langInstruction}` : ''}
 Phases/milestones:
 ${phases}
 
-Produce ONLY days ${start} through ${end} (inclusive). Respond ONLY with valid JSON:
+${existingTitles ? `Days already covered (DO NOT REPEAT these topics): ${existingTitles}` : ''}
+
+Produce ONLY days ${start} through ${end} (inclusive). Each day must have a UNIQUE topic not covered in earlier days. Respond ONLY with valid JSON:
 {
   "days": [
     { "day": ${start}, "week": ${Math.floor((start - 1) / 7) + 1}, "phase": "matching phase name", "title": "focused topic", "description": "1 sentence", "type": "lesson|practice|review|project" }
@@ -564,6 +574,17 @@ function normalizeDraft(draft: RoadmapDraft, requestedDuration: number | null): 
       type: typeof d.type === 'string' ? d.type : 'lesson',
     }))
     .sort((a, b) => a.day - b.day)
+
+  // Deduplicate near-identical day titles (case-insensitive exact match)
+  const seenTitles = new Map<string, number>()
+  for (const day of normalizedDays) {
+    const key = day.title.toLowerCase().trim()
+    if (seenTitles.has(key)) {
+      // Append day number to disambiguate duplicate titles
+      day.title = `${day.title} (Day ${day.day})`
+    }
+    seenTitles.set(key, day.day)
+  }
 
   return {
     ...draft,
@@ -933,7 +954,7 @@ Respond ONLY with a valid JSON object in this exact format:
   try {
     const content = await createChatCompletion(
       [{ role: 'user', content: prompt }],
-      { temperature: 0.1, maxTokens: 400 }
+      { temperature: 0.1, maxTokens: 500 }
     )
     const parsed = extractJson<{ selectedCandidateId?: number; reason?: string }>(content)
     if (typeof parsed.selectedCandidateId === 'number') {

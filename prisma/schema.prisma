@@ -59,6 +59,7 @@ model Task {
   createdAt   DateTime @default(now())
 
   @@index([goalId])
+  @@index([goalId, day])
 }
 
 // Cached scraped/curated content per day, so the web is hit only once per day.
@@ -117,6 +118,7 @@ model QuizAttempt {
   createdAt DateTime @default(now())
 
   @@index([goalId, userId])
+  @@index([goalId, day])
 }
 
 model Milestone {

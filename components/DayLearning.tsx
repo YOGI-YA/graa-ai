@@ -78,6 +78,7 @@ export default function DayLearning({
   )
   const [fetchingLanguageVideo, setFetchingLanguageVideo] = useState(false)
   const [refreshingVideo, setRefreshingVideo] = useState(false)
+  const videoFetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [selectedVideoType, setSelectedVideoType] = useState<'global' | 'localized'>(
     language && language !== 'en' ? 'localized' : 'global'
   )
@@ -136,29 +137,36 @@ export default function DayLearning({
   }, [goalId, day])
 
   const handleFetchLanguageVideo = useCallback(async (targetLang: string) => {
+    // Debounce rapid language switches (600ms)
+    if (videoFetchDebounceRef.current) {
+      clearTimeout(videoFetchDebounceRef.current)
+    }
     setVideoLanguage(targetLang)
     setSelectedVideoType('localized')
-    setFetchingLanguageVideo(true)
-    try {
-      const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: targetLang, type: 'localized' }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch video')
-      setContent(prev => prev ? { ...prev, video: data.video } : null)
-      const langInfo = getLanguage(targetLang)
-      if (data.video?.localized) {
-        notify(`Loaded verified ${langInfo.name} tutorial`, 'success')
-      } else {
-        notify(`No verified ${langInfo.name} video found, fallback applied`, 'info')
+
+    videoFetchDebounceRef.current = setTimeout(async () => {
+      setFetchingLanguageVideo(true)
+      try {
+        const res = await fetch(`/api/goals/${goalId}/day/${day}/video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ language: targetLang, type: 'localized' }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch video')
+        setContent(prev => prev ? { ...prev, video: data.video } : null)
+        const langInfo = getLanguage(targetLang)
+        if (data.video?.localized) {
+          notify(`Loaded verified ${langInfo.name} tutorial`, 'success')
+        } else {
+          notify(`No verified ${langInfo.name} video found, fallback applied`, 'info')
+        }
+      } catch (err) {
+        notify(err instanceof Error ? err.message : 'Could not fetch language video', 'error')
+      } finally {
+        setFetchingLanguageVideo(false)
       }
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Could not fetch language video', 'error')
-    } finally {
-      setFetchingLanguageVideo(false)
-    }
+    }, 600)
   }, [goalId, day])
 
   const handleReverifyVideo = useCallback(async () => {
