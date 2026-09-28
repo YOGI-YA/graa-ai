@@ -1,303 +1,298 @@
-# 🎓 Graa AI — Autonomous Day-by-Day Learning Platform
+# Graa AI
 
-[![GitHub Repository](https://img.shields.io/badge/GitHub-YogenderVermaa%2Fgraa--ai-orange?style=flat&logo=github)](https://github.com/YogenderVermaa/graa-ai)
-[![Next.js](https://img.shields.io/badge/Next.js-16%20(App%20Router)-black?style=flat&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![Prisma](https://img.shields.io/badge/ORM-Prisma%205-2D3748?style=flat&logo=prisma)](https://www.prisma.io/)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20pgvector-336791?style=flat&logo=postgresql)](https://neon.tech/)
-[![Groq](https://img.shields.io/badge/AI%20Inference-Groq%20(Sub--4s)-f55036?style=flat)](https://groq.com/)
-[![AWS Ready](https://img.shields.io/badge/Deployment-AWS%20App%20Runner%20%2F%20Docker-FF9900?style=flat&logo=amazon-aws)](https://aws.amazon.com/)
-
-**Graa AI** transforms any academic syllabus, university textbook, or learning goal into an actionable, **day-by-day mastery roadmap**. It pairs structured daily progression with curated video tutorials, progressive lessons, active-recall quiz gates, a live multi-language code playground, an AI mentor grounded in your curriculum via RAG, and an overall cross-goal performance analytics dashboard.
-
-> 💡 **Self-Contained Architecture:** Graa AI runs as a single, unified Next.js application. **You do NOT need any external microservice or Python worker** to host this platform. It handles large 50MB+ textbooks directly via client-side PDF.js and native Node.js.
+Graa AI is an open-source, full-stack autonomous learning platform built with Next.js, TypeScript, PostgreSQL, and a multi-tier AI inference engine. It converts learning goals, syllabi, or academic textbooks into structured, day-by-day mastery roadmaps featuring gated milestone progression, active-recall quizzes, an interactive code sandbox, and a retrieval-augmented generation (RAG) AI mentor.
 
 ---
 
-## ⚡ Quick Start in 4 Steps (Run Locally in 5 Minutes)
+## Repository
 
-### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/YogenderVermaa/graa-ai.git
-cd graa-ai/graa-ai
+git clone https://github.com/YOGI-YA/graa-ai.git
+cd graa-ai
 ```
 
-### Step 2: Install Dependencies
+---
+
+## System Architecture
+
+```text
++-----------------------------------------------------------------------------------+
+|                                  USER / CLIENT                                    |
+|   Browser (Next.js App Router UI)                                                 |
+|   - Goal Creation & Document Ingestion (Client-side PDF.js extraction)            |
+|   - Day-by-Day Learning Interface (Lessons, Gated MCQs, Interactive Playground)   |
+|   - Real-time AI Mentor Chat (Streaming Server-Sent Events)                       |
++-----------------------------------------+-----------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|                             NEXT.JS API BACKEND                                   |
+|                                                                                   |
+|  [Auth Layer]          [Curriculum Engine]        [Analytics & Progress]          |
+|  NextAuth (JWT/OAuth)  Docx/PDF text extraction   Streak & Accuracy Tracking      |
++-------------------+--------------------+--------------------+---------------------+
+                    |                    |                    |
+                    v                    v                    v
++-----------------------------------------------------------------------------------+
+|                        MULTI-TIER AI INFERENCE FALLBACK                           |
+|                                                                                   |
+|   TIER 1: GROQ (Ultra-low latency primary)                                        |
+|   - Models: openai/gpt-oss-120b -> qwen/qwen3.8-27b -> openai/gpt-oss-20b         |
+|   - Key Pool: GROQ_API_KEY_1, _2, _3 (Round-robin + 429 Cooldown)                |
+|           | (on rate limit, quota exhaustion, or service outage)                  |
+|           v                                                                       |
+|   TIER 2: NVIDIA NIM (High-intelligence failover & Vision OCR)                    |
+|   - Models: meta/llama-3.2-11b-vision-instruct -> nemotron-70b -> llama-3.2-90b    |
+|   - Key Pool: NVIDIA_API_KEY (Automatic failover)                                 |
+|           | (if configured)                                                       |
+|           v                                                                       |
+|   TIER 3: EXTENDED PROVIDERS (OpenRouter, Cerebras, SambaNova, Together AI)       |
++-----------------------------------------+-----------------------------------------+
+                                          |
+                    +---------------------+---------------------+
+                    |                                           |
+                    v                                           v
++---------------------------------------+   +---------------------------------------+
+|        VECTOR RAG & EMBEDDINGS        |   |         DATABASE & STORAGE            |
+|                                       |   |                                       |
+|  Jina AI Embeddings Engine            |   |  Neon PostgreSQL                      |
+|  - Model: jina-embeddings-v3 (384-dim)|   |  - Core data: Users, Goals, Lessons,  |
+|  - Key Pool: EMBEDDINGS_API_KEY_1,2,3 |   |    Milestones, Quizzes, Progress      |
+|  - Automatic failover & key rotation  |   |  - pgvector: content_chunks table for |
+|                                       |   |    grounded semantic search in chat   |
++---------------------------------------+   +---------------------------------------+
+                    |
+                    v
++-----------------------------------------------------------------------------------+
+|                            CODE EXECUTION SANDBOX                                 |
+|  - Paiza.io API (Default zero-config runner for 11+ languages)                    |
+|  - Optional self-hosted Piston Engine (Isolated container runtime)                |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+## Key Features
+
+- **Document & Syllabus Ingestion**: Extracts text from PDFs (client-side PDF.js and server-side stream decoding), Word documents (`.docx`), Markdown, and scanned documents via Vision OCR.
+- **Atomic Roadmap Generation**: Deconstructs high-level goals or course syllabi into focused, sequential daily modules with explicit milestones.
+- **Gated Progression Loop**: Unlocks each subsequent day only after passing the active-recall multiple-choice quiz (70% threshold).
+- **Interactive Code Playground**: Embedded Monaco editor with support for 11 languages, automated AI feedback, and code execution.
+- **RAG-Grounded AI Mentor**: Streaming chat assistant grounded directly in the user's uploaded syllabus via pgvector cosine similarity search.
+- **Resilient AI Fallback Engine**: Multi-key rotation, automatic rate-limit cooldown handling, and seamless multi-provider failover (Groq to NVIDIA NIM).
+
+---
+
+## Quick Start
+
+### 1. Prerequisites
+
+- Node.js 18.18 or higher (Node 20+ recommended)
+- PostgreSQL database instance with the `pgvector` extension enabled (e.g., Neon.tech)
+
+### 2. Installation
+
 ```bash
+git clone https://github.com/YOGI-YA/graa-ai.git
+cd graa-ai
 npm install
 ```
 
-### Step 3: Configure Environment Variables
-Create a file named `.env` in the root folder (`graa-ai/graa-ai/.env`) and paste the configuration below (see [Environment Variables Section](#-complete-copy-paste-env-file) for exact details).
+### 3. Environment Setup
 
-### Step 4: Initialize Database & Start
+Create a `.env` file in the root directory:
+
+```bash
+cp .env.example .env
+```
+
+Populate the variables in `.env` (refer to the [Environment Variables](#environment-variables) section below).
+
+### 4. Database Setup & Run
+
+Push the Prisma schema to your PostgreSQL database:
+
 ```bash
 npx prisma db push
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser!
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🔑 The 4 Required Services (All 100% Free)
+## Environment Variables
 
-You only need **3 free API keys + 1 free database connection** to run the entire platform:
+All supported environment variables are detailed below:
 
-| # | Service | Purpose | Free Tier Limit | Where to Get (2 Mins) |
-|---|:---|:---|:---|:---|
-| **1** | **Neon PostgreSQL** | Primary Database + Vector Storage (`pgvector`) | 0.5 GB Free Forever | [neon.tech](https://neon.tech) ➔ Create Project ➔ Copy `DATABASE_URL` |
-| **2** | **Groq Cloud** | Fast Roadmap & Quiz Generation | Generous Free Rate Limits | [console.groq.com](https://console.groq.com) ➔ API Keys ➔ Create Key (`gsk_...`) |
-| **3** | **Jina AI** | AI Mentor RAG Embeddings | 10,000,000 Free Tokens | [jina.ai/embeddings](https://jina.ai/embeddings) ➔ Generate API Key (`jina_...`) |
-| **4** | **NextAuth Secret** | Secures User Login & JWTs | Free | Run terminal command: `openssl rand -hex 32` |
-
-*(NVIDIA Vision AI, Google OAuth, and Piston Sandbox are 100% **optional** — the application runs completely without them).*
+| Variable | Description | Required / Optional | Default / Example Value |
+|:---|:---|:---|:---|
+| `DATABASE_URL` | PostgreSQL connection string (supports `pgvector`). | **Required** | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` |
+| `NEXTAUTH_SECRET` | 32-byte secret string used to sign session cookies and JWTs. Generate using `openssl rand -hex 32`. | **Required** | `7f3c1d9a2b8e...` |
+| `NEXTAUTH_URL` | Canonical base URL of the application. | **Required** | `http://localhost:3000` (development) or `https://your-domain.com` (production) |
+| `NEXT_PUBLIC_SITE_URL` | Public site URL used for metadata, OpenGraph tags, and canonical links. | **Required** | `https://graaai.vercel.app` |
+| `GROQ_API_KEY_1` | Primary Groq API key for high-speed LLM inference. | **Required** | `gsk_...` |
+| `GROQ_API_KEY_2` | Secondary Groq key for automatic round-robin rotation and 429 failover. | Optional | `gsk_...` |
+| `GROQ_API_KEY_3` | Tertiary Groq key for rotation and rate-limit mitigation. | Optional | `gsk_...` |
+| `GROQ_MODEL` | Primary LLM model identifier on Groq. | Optional | `openai/gpt-oss-120b` (falls back to `qwen/qwen3.8-27b`) |
+| `NVIDIA_API_KEY` | NVIDIA NIM API key for secondary LLM failover and Vision OCR document parsing. | Optional | `nvapi-...` |
+| `NVIDIA_MODEL` | Model identifier used for NVIDIA NIM inference and fallback. | Optional | `meta/llama-3.2-11b-vision-instruct` |
+| `EMBEDDINGS_API_URL` | Endpoint URL for the vector embeddings service. | Optional | `https://api.jina.ai/v1/embeddings` |
+| `EMBEDDINGS_API_KEY` | Primary API key for vector embeddings (Jina AI). | Optional | `jina_...` |
+| `EMBEDDINGS_API_KEY_1` | First key in the embedding key rotation pool. | Optional | `jina_...` |
+| `EMBEDDINGS_API_KEY_2` | Second key in the embedding rotation pool for rate-limit failover. | Optional | `jina_...` |
+| `EMBEDDINGS_API_KEY_3` | Third key in the embedding rotation pool. | Optional | `jina_...` |
+| `EMBEDDINGS_MODEL` | Model used for document and query vector generation. | Optional | `jina-embeddings-v3` |
+| `EMBEDDING_DIM` | Dimensionality of the generated vector embeddings (matches pgvector schema). | Optional | `384` |
+| `PISTON_URL` | Base URL for a self-hosted Piston code execution sandbox. Leave blank to use Paiza.io. | Optional | `http://localhost:2000` |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID for social sign-in. | Optional | `your-client-id.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret for social sign-in. | Optional | `GOCSPX-...` |
+| `PDF_EXTRACTOR_SERVICE_URL` | URL to a standalone microservice for heavy PDF extraction. Not required; native parser is active. | Optional | `http://localhost:8000` |
 
 ---
 
-## ⚙️ Complete Copy-Paste `.env` File
+## Complete Ready-to-Run `.env` Configuration
 
-Create a file named **`.env`** in `graa-ai/graa-ai/.env` and paste this block directly:
+To get running immediately, create a file named `.env` in the project root and paste this configuration directly:
 
 ```bash
 # ==============================================================================
-# 1. DATABASE (PostgreSQL with pgvector) - REQUIRED
+# Database (PostgreSQL with pgvector)
 # ==============================================================================
-# Create a free project at https://neon.tech and paste your connection string:
-DATABASE_URL="postgresql://username:password@ep-your-instance.region.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL=""
 
 # ==============================================================================
-# 2. NEXTAUTH AUTHENTICATION - REQUIRED
+# Authentication (NextAuth)
 # ==============================================================================
-# Generate with: openssl rand -hex 32
-NEXTAUTH_SECRET="7f3c1d9a2b8e4f5061728394a5b6c7d8e9f0123456789abcdef0123456789abc"
-
-# Local URL for development (change to https://your-domain.com in production)
+NEXTAUTH_SECRET=""
 NEXTAUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+NEXT_PUBLIC_SITE_URL="https://graaai.vercel.app"
 
 # ==============================================================================
-# 3. AI INFERENCE (Groq) - REQUIRED
+# AI Inference - Tier 1 Primary (Groq with 3-key rotation)
 # ==============================================================================
-# Get your free key at https://console.groq.com
-GROQ_API_KEY_1="gsk_your_groq_api_key_here"
+GROQ_API_KEY_1=""
+GROQ_API_KEY_2=""
+GROQ_API_KEY_3=""
+GROQ_MODEL="openai/gpt-oss-120b"
 
-# Model setting: qwen/qwen3.8-27b generates roadmaps in ~3.2s with zero reasoning overhead
-GROQ_MODEL="qwen/qwen3.8-27b"
+# ==============================================================================
+# AI Inference - Tier 2 Fallback & Vision OCR (NVIDIA NIM)
+# ==============================================================================
+NVIDIA_API_KEY=""
+NVIDIA_MODEL="meta/llama-3.2-11b-vision-instruct"
 
 # ==============================================================================
-# 4. VECTOR EMBEDDINGS (Jina AI) - REQUIRED FOR AI MENTOR
+# Vector Embeddings for RAG (Jina AI with 3-key rotation)
 # ==============================================================================
-# Get your free key at https://jina.ai/embeddings
 EMBEDDINGS_API_URL="https://api.jina.ai/v1/embeddings"
-EMBEDDINGS_API_KEY_1="jina_your_jina_key_here"
+EMBEDDINGS_API_KEY=""
+EMBEDDINGS_API_KEY_1=""
+EMBEDDINGS_API_KEY_2=""
+EMBEDDINGS_API_KEY_3=""
 EMBEDDINGS_MODEL="jina-embeddings-v3"
 EMBEDDING_DIM="384"
 
 # ==============================================================================
-# 5. VISION AI / OCR FALLBACK - OPTIONAL
+# Optional Services
 # ==============================================================================
-# Optional: Used only if a user uploads a pure scanned image PDF without selectable text
-NVIDIA_API_KEY="nvapi-optional_nvidia_key_here"
-NVIDIA_MODEL="meta/llama-3.2-11b-vision-instruct"
-
-# ==============================================================================
-# 6. CODE PLAYGROUND COMPILER - OPTIONAL
-# ==============================================================================
-# Leave empty to use free Paiza.io compiler (no setup needed).
 PISTON_URL=""
-
-# ==============================================================================
-# 7. GOOGLE OAUTH LOGIN - OPTIONAL
-# ==============================================================================
-# Leave empty to use standard Email/Password authentication.
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
+PDF_EXTRACTOR_SERVICE_URL=""
 ```
 
 ---
 
-## ☁️ How to Host This Platform
+## How the Fallback Chain Operates
 
-You have three clean options to deploy Graa AI. **AWS App Runner** is recommended for production.
-
-```
-                          ┌─────────────────────────┐
-                          │   GitHub Repository     │
-                          │ YogenderVermaa/graa-ai  │
-                          └────────────┬────────────┘
-                                       │
-                ┌──────────────────────┼──────────────────────┐
-                ▼                      ▼                      ▼
-      ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-      │  AWS App Runner  │   │  Docker / VPS    │   │      Vercel      │
-      │   (Recommended)  │   │ (EC2/Lightsail)  │   │  (Serverless)    │
-      │ • Auto HTTPS/SSL │   │ • docker-compose │   │ • 1-click import │
-      │ • Zero server ops│   │ • Full control   │   │ • Edge gateway   │
-      └──────────────────┘   └──────────────────┘   └──────────────────┘
-```
+1. **Round-Robin Key Balancing**: Requests are distributed across configured keys (`GROQ_API_KEY_1`, `_2`, `_3`) to maintain balance within RPM and TPM quotas.
+2. **Cooldown Management**:
+   - `429 Too Many Requests`: Puts the affected key on a 35-second cooldown and routes subsequent requests to the next healthy key immediately.
+   - `401 / 403 Authentication Error`: Puts the invalid key on a 5-minute cooldown.
+   - `5xx Provider Error`: Puts the key on a 15-second cooldown.
+3. **Immediate Model Skipping**: If an endpoint returns `400 Bad Request` or `404 Not Found` (e.g., deprecated model parameter or decommissioned model), the engine skips all remaining keys for that model and switches to the next fallback model in the list.
+4. **Provider Cascade**: If all Groq keys are exhausted or rate-limited, requests fail over to NVIDIA NIM (`meta/llama-3.2-11b-vision-instruct` and `nvidia/llama-3.1-nemotron-70b-instruct`).
+5. **Reasoning Model Handling**: When using models with internal reasoning tokens (e.g., `openai/gpt-oss-120b`), token allocations are dynamically expanded (2048 in streaming, up to 4096 in standard calls) to prevent token cutoff.
 
 ---
 
-### Method 1: Deploy to AWS (Recommended: AWS App Runner)
+## Deployment
 
-AWS App Runner runs containerized Next.js apps directly from GitHub with automatic SSL, zero server management, and auto-scaling.
+### Docker
 
-1. **Log in to AWS Console**: Open [AWS App Runner](https://console.aws.amazon.com/apprunner).
-2. **Create Service**: Click **Create service**.
-3. **Connect GitHub**:
-   - Choose **Source code repository** ➔ Connect your GitHub account.
-   - Select repository: `YogenderVermaa/graa-ai`, Branch: `main`.
-   - Deployment trigger: **Automatic**.
-4. **Configure Build Settings**:
-   - **Runtime**: `Nodejs 20` *(or select Container image if deploying via Docker)*.
-   - **Build command**:
-     ```bash
-     npx prisma generate && npm run build
-     ```
-   - **Start command**:
-     ```bash
-     npm start
-     ```
-   - **Port**: `3000`
-5. **Add Environment Variables**:
-   - Under **Environment variables**, copy-paste the variables from your `.env` file (`DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GROQ_API_KEY_1`, `GROQ_MODEL`, etc.).
-   - Make sure `NEXTAUTH_URL` is set to your production domain or App Runner URL.
-6. **Click Deploy**:
-   - AWS will build the project and assign a secure `https://...awsapprunner.com` live URL in ~3–5 minutes.
-
-*(For AWS ECS, Fargate, and EC2 walkthroughs, see [`AWS_DEPLOYMENT.md`](AWS_DEPLOYMENT.md)).*
-
----
-
-### Method 2: Deploy with Docker / Docker Compose (Any VPS / DigitalOcean / EC2)
-
-The project includes an optimized multi-stage [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml):
+A production-ready `Dockerfile` and `docker-compose.yml` are included in the repository.
 
 ```bash
-# 1. Connect to your server via SSH and clone
-git clone https://github.com/YogenderVermaa/graa-ai.git
-cd graa-ai/graa-ai
-
-# 2. Configure environment
-cp .env.example .env
-nano .env # Paste your database and API keys
-
-# 3. Push database schema
-npx prisma db push
-
-# 4. Start production container in background
+# 1. Build and start the container in detached mode
 docker-compose up -d --build
+
+# 2. Apply database migrations
+docker-compose exec app npx prisma db push
 ```
-Your app is now live at `http://your-server-ip:3000`.
+
+The application will be accessible at `http://localhost:3000`.
+
+### Vercel
+
+1. Import the repository `https://github.com/YOGI-YA/graa-ai` in the Vercel dashboard.
+2. Under **Project Settings > Environment Variables**, add the variables from your `.env` file.
+3. Set `NEXTAUTH_URL` to your production domain (e.g., `https://your-domain.vercel.app`).
+4. Deploy the project.
+
+### AWS App Runner
+
+1. Connect the GitHub repository `https://github.com/YOGI-YA/graa-ai` to AWS App Runner.
+2. Select runtime: `Nodejs 20`.
+3. Build command:
+   ```bash
+   npx prisma generate && npm run build
+   ```
+4. Start command:
+   ```bash
+   npm start
+   ```
+5. Set port to `3000` and supply the environment variables in the App Runner console.
 
 ---
 
-### Method 3: Deploy to Vercel
+## Project Structure
 
-1. Go to [Vercel](https://vercel.com) and click **Add New → Project**.
-2. Import `YogenderVermaa/graa-ai`.
-3. Under **Environment Variables**, paste all the variables from your `.env`.
-4. Set `NEXTAUTH_URL` to `https://your-vercel-domain.vercel.app`.
-5. Click **Deploy**.
-
----
-
-## 🎯 What Graa AI Does (Feature Tour)
-
-### 1. 📤 Syllabus & Large Textbook Processing (Up to 50MB+)
-- Users can upload entire multi-chapter university textbooks (PDF, Word `.docx`, or Markdown).
-- **Client-Side PDF.js Engine**: Decodes the PDF directly in the user's browser, pulling out the Table of Contents, Unit outlines, and chapters in **~1.5 seconds**.
-- **Interactive "Behind the Scenes" Visualizer**: Shows live terminal telemetry, an elapsed timer, stage checklist, and study tips while generating the roadmap in **~3.5 seconds**.
-
-### 2. 🗺️ Gated Day-by-Day Learning Loop
-- Each day includes:
-  - 🎥 **Curated Video Lesson**: Goal-aligned YouTube tutorial matching the exact day's topic.
-  - 📖 **AI-Synthesized Lesson**: Formatted reading covering core theory.
-  - 📝 **70% Gated MCQ Quiz**: Pass with at least 70% to unlock practice.
-  - 💻 **Interactive Code Playground**: Monaco editor supporting 11 programming languages with Run, progressive Hints, and automated AI review.
-  - 🔒 **Gated Progression**: Day $N+1$ unlocks only when Day $N$ is completed.
-
-### 3. 📊 Overall Cross-Goal Performance Dashboard (`/dashboard/performance`)
-- **Mastery Radar Chart**: Assesses Consistency, Velocity, Accuracy, Depth, Problem Solving, and Retention.
-- **Activity Heatmap**: Tracks learning streaks and study days.
-- **Subject Breakdown**: Visualizes completion and quiz accuracy across subjects.
-
-### 4. 🤖 Context-Aware AI Mentor (Graa)
-- Available on every lesson page.
-- Grounded directly in the user's active syllabus via **Retrieval-Augmented Generation (RAG)** using PostgreSQL `pgvector` and Jina AI embeddings.
-
----
-
-## 📁 Repository Directory Structure
-
-```
+```text
 graa-ai/
 ├── app/
-│   ├── page.tsx                     # Landing page with interactive hero
-│   ├── login/ & register/           # NextAuth credentials & Google login
-│   ├── dashboard/                   # Main dashboard (Goal cards, stats, curriculum upload)
-│   │   └── performance/             # Cross-goal performance & mastery analytics
-│   ├── goals/[id]/                  # Interactive roadmap view (phases, milestones, days)
-│   │   └── day/[day]/               # Day learning interface (Video, AI lesson, Quiz, Sandbox)
-│   ├── profile/                     # User preferences & learning style settings
-│   └── api/
-│       ├── auth/[...nextauth]/      # NextAuth authentication endpoints
-│       ├── curriculum/parse/        # Curriculum parser & atomic roadmap creator
-│       ├── performance/             # Performance analytics aggregation API
-│       ├── goals/ & goals/[id]/     # Goal CRUD & day content endpoints
-│       ├── chat/                    # RAG AI mentor streaming endpoint
-│       └── run/                     # Multi-language code execution runner
-├── components/
-│   ├── CurriculumUploadModal.tsx    # Upload modal with live "Behind the Scenes" visualizer
-│   ├── OverallPerformanceDashboard.tsx # Radar charts, velocity, and activity heatmaps
-│   ├── DayLearning.tsx              # Day lesson, video player, language switcher
-│   ├── CodePlayground.tsx           # Monaco editor with multi-language execution
-│   ├── QuizPanel.tsx                # Gated MCQ assessment component
-│   └── RoadmapGraph.tsx             # Interactive milestone & task progression tree
+│   ├── api/                         # Backend API route handlers
+│   │   ├── auth/[...nextauth]/      # NextAuth authentication endpoints
+│   │   ├── chat/                    # RAG mentor streaming SSE endpoint
+│   │   ├── curriculum/parse/        # Document parser and roadmap generator
+│   │   ├── goals/                   # Goal and milestone CRUD routes
+│   │   ├── performance/             # Analytics and mastery aggregation
+│   │   └── run/                     # Multi-language code runner endpoint
+│   ├── dashboard/                   # Main user dashboard and metrics
+│   ├── goals/[id]/                  # Roadmap viewer and daily task flow
+│   │   └── day/[day]/               # Day lesson, quiz, and sandbox
+│   ├── login/ & register/           # Authentication pages
+│   └── page.tsx                     # Landing page
+├── components/                      # Reusable React components
 ├── lib/
-│   ├── clientCurriculumParser.ts    # In-browser PDF.js & Table of Contents extraction
-│   ├── curriculumParser.ts          # Server-side native PDF & Word document parsing
-│   ├── groq.ts                      # Multi-provider LLM inference engine (Groq, NVIDIA)
-│   ├── rag.ts                       # pgvector vector store & context retrieval
-│   └── prisma.ts                    # PostgreSQL Prisma client & connection pooling
+│   ├── auth.ts                      # NextAuth configuration and providers
+│   ├── curriculumParser.ts          # PDF, DOCX, and image OCR processing
+│   ├── embeddings.ts                # Jina embeddings multi-key fallback engine
+│   ├── groq.ts                      # Multi-tier LLM inference fallback chain
+│   ├── prisma.ts                    # Prisma client singleton
+│   └── rag.ts                       # pgvector chunking, indexing, and retrieval
 ├── prisma/
-│   └── schema.prisma                # PostgreSQL database schema with composite indexes
-├── public/
-│   └── pdf.worker.min.mjs           # Local offline WebAssembly PDF worker
-├── Dockerfile                       # Production multi-stage Alpine Dockerfile
-├── docker-compose.yml               # Production container runner
-├── AWS_DEPLOYMENT.md                # Dedicated step-by-step AWS deployment guide
-└── next.config.ts                   # Next.js config with standalone output enabled
+│   └── schema.prisma                # PostgreSQL data schema
+└── types/                           # Shared TypeScript type definitions
 ```
 
 ---
 
-## ❓ Frequently Asked Questions (FAQ)
+## License
 
-<details>
-<summary><b>1. Do I need to pay for any services to host this?</b></summary>
-No. Neon provides a free PostgreSQL database, Groq provides generous free AI inference, Jina provides 10M free tokens, and Vercel/App Runner have free tiers. You can run Graa AI completely free of cost.
-</details>
-
-<details>
-<summary><b>2. Why is there no separate Python microservice needed?</b></summary>
-We upgraded the document architecture: large 50MB PDFs are decoded directly inside the user's browser using WebAssembly PDF.js. The browser extracts the Table of Contents outline (~20KB) and sends it as text. Any server fallback is handled natively in Node.js using <code>pdf-parse</code>.
-</details>
-
-<details>
-<summary><b>3. What should I do if database changes are made?</b></summary>
-Whenever <code>prisma/schema.prisma</code> is updated, run <code>npx prisma db push</code> to apply the latest tables and indexes to your database.
-</details>
-
-<details>
-<summary><b>4. How do I change the AI model?</b></summary>
-In your <code>.env</code> file, update <code>GROQ_MODEL</code>. We recommend <code>qwen/qwen3.8-27b</code> for ultra-fast ~3.2s roadmap generation.
-</details>
-
----
-
-## 📜 License & Credits
-
-- **License**: MIT License (Open Source — free for personal and commercial use).
-- **Author**: [Yogender Verma](https://github.com/YogenderVermaa)
-- **Repository**: [https://github.com/YogenderVermaa/graa-ai](https://github.com/YogenderVermaa/graa-ai)
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

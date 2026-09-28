@@ -38,7 +38,9 @@ interface GroqChatResponse {
     }
     delta?: {
       content?: string
+      reasoning?: string
     }
+    finish_reason?: string
   }>
 }
 
@@ -128,9 +130,9 @@ export function getAllConfiguredProviders(customModel?: string): ProviderEndpoin
   const gKeys = groqKeys()
   if (gKeys.length > 0) {
     const groqModels = [
-      customModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
-      'qwen/qwen3.8-27b',
+      customModel || process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
       'openai/gpt-oss-120b',
+      'qwen/qwen3.8-27b',
       'openai/gpt-oss-20b',
       'allam-2-7b',
     ].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
@@ -152,13 +154,12 @@ export function getAllConfiguredProviders(customModel?: string): ProviderEndpoin
   const nKeys = nvidiaKeys()
   if (nKeys.length > 0) {
     const nvidiaModels = [
-      process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct',
-      'meta/llama-3.3-70b-instruct',
-      'meta/llama-3.1-70b-instruct',
-      'meta/llama-3.1-8b-instruct',
-      'mistralai/mixtral-8x22b-instruct-v0.1',
-      'nvidia/llama-3.1-nemotron-70b-instruct',
+      process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct',
       'meta/llama-3.2-11b-vision-instruct',
+      'nvidia/llama-3.1-nemotron-70b-instruct',
+      'meta/llama-3.2-90b-vision-instruct',
+      'mistralai/mistral-large-2-instruct',
+      'mistralai/mistral-7b-instruct-v0.3',
     ].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
 
     providers.push({
@@ -166,7 +167,7 @@ export function getAllConfiguredProviders(customModel?: string): ProviderEndpoin
       url: 'https://integrate.api.nvidia.com/v1/chat/completions',
       keys: nKeys,
       models: nvidiaModels,
-      maxTokensCap: 2048,
+      maxTokensCap: 4096,
       headers: (key: string) => ({
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
@@ -342,10 +343,14 @@ export async function createChatCompletion(
   for (let round = 0; round < 3; round++) {
     for (const provider of providers) {
       const keys = getBalancedKeys(provider.name, provider.keys)
-      const maxTokens = Math.min(options.maxTokens || 4000, provider.maxTokensCap || 4096)
+      const maxTokens = Math.min(Math.max(options.maxTokens || 4000, 2048), provider.maxTokensCap || 4096)
 
       for (const model of provider.models) {
+        let skipModel = false
+
         for (const key of keys) {
+          if (skipModel) break
+
           // If on cooldown and we're not on the final desperation round, skip to next healthy key
           if (!isKeyHealthy(provider.name, key) && round < 2) {
             continue
@@ -373,24 +378,37 @@ export async function createChatCompletion(
               }
             )
 
-            const content = response.data.choices?.[0]?.message?.content?.trim()
+            const choice = response.data.choices?.[0]
+            const content = choice?.message?.content?.trim()
             if (content) {
               return content
+            }
+
+            // Fallback for reasoning models if content was empty
+            const reasoning = (choice?.message as any)?.reasoning?.trim()
+            if (!content && choice?.finish_reason === 'length') {
+              // Token cutoff occurred during reasoning phase -> switch to next model
+              skipModel = true
+              break
+            }
+            if (!content && reasoning) {
+              return reasoning
             }
           } catch (err: any) {
             const status = axios.isAxiosError(err) ? err.response?.status : undefined
 
             if (status === 429) {
-              // Rate limited -> cooldown for 35 seconds
+              // Rate limited -> cooldown for 35 seconds and try next key
               markKeyCooldown(provider.name, key, 35000)
               continue
             } else if (status === 401 || status === 403) {
-              // Invalid key / quota exhausted -> cooldown for 5 minutes
+              // Invalid key / quota exhausted -> cooldown for 5 minutes and try next key
               markKeyCooldown(provider.name, key, 300000)
               continue
             } else if (status === 400 || status === 404) {
-              // Model error / incompatible params -> try next model
-              continue
+              // Model error or unsupported endpoint -> skip model immediately across all keys
+              skipModel = true
+              break
             } else if (status && status >= 500) {
               // Provider error -> cooldown for 15 seconds
               markKeyCooldown(provider.name, key, 15000)
@@ -472,8 +490,17 @@ export function getLanguageInstruction(langCode?: string | null): string {
 function extractJson<T = any>(content: string): T {
   let clean = content.trim()
   
-  // Remove markdown code fences if wrapped entirely
-  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  // Strip reasoning blocks emitted by thinking/reasoning models (e.g. gpt-oss, deepseek)
+  clean = clean.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+  clean = clean.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim()
+
+  // Extract from markdown code fences if present anywhere in text
+  const fenceMatch = clean.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fenceMatch && fenceMatch[1]) {
+    clean = fenceMatch[1].trim()
+  } else {
+    clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  }
 
   // Find object bounds
   const firstBrace = clean.indexOf('{')
@@ -1371,7 +1398,7 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
     model,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: 0.7,
-    max_tokens: 600,
+    max_tokens: 2048,
     top_p: 0.95,
     stream: true,
   })
@@ -1388,7 +1415,10 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
     for (const provider of providers) {
       const keys = getBalancedKeys(provider.name, provider.keys)
       for (const model of provider.models) {
+        let skipModel = false
+
         for (const key of keys) {
+          if (skipModel) break
           if (!isKeyHealthy(provider.name, key) && round === 0) {
             continue
           }
@@ -1413,6 +1443,10 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
               markKeyCooldown(provider.name, key, 35000)
             } else if (res.status === 401 || res.status === 403) {
               markKeyCooldown(provider.name, key, 300000)
+            } else if (res.status === 400 || res.status === 404) {
+              // Invalid model or parameter -> skip this model across all keys
+              skipModel = true
+              break
             } else if (res.status >= 500) {
               markKeyCooldown(provider.name, key, 15000)
             }
@@ -1434,12 +1468,16 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ''
+  let totalTokensEmitted = 0
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
+          if (totalTokensEmitted === 0) {
+            controller.enqueue(encoder.encode("I'm here to help you learn! What topic would you like to explore?"))
+          }
           controller.close()
           return
         }
@@ -1453,6 +1491,9 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
           if (!trimmed.startsWith('data:')) continue
           const data = trimmed.slice(5).trim()
           if (data === '[DONE]') {
+            if (totalTokensEmitted === 0) {
+              controller.enqueue(encoder.encode("I'm here to help you learn! What topic would you like to explore?"))
+            }
             controller.close()
             return
           }
@@ -1461,6 +1502,7 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
             const token = json.choices?.[0]?.delta?.content
             if (token) {
               controller.enqueue(encoder.encode(token))
+              totalTokensEmitted++
               enqueuedAny = true
             }
           } catch {
@@ -1510,7 +1552,7 @@ Be concise, warm, highly knowledgeable, practical, and encouraging.${goalContext
     ],
     {
       temperature: 0.7,
-      maxTokens: 500,
+      maxTokens: 1500,
     }
   )
 
