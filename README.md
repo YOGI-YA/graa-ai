@@ -156,27 +156,92 @@ Your application will be live at `http://localhost:3000` (or your server's publi
 
 ---
 
-## ⚙️ Environment Variables Reference
+## ⚙️ Complete Environment Variables (`.env`)
 
-Copy `.env.example` to `.env` and fill in the values:
+Create a `.env` file in the root directory and copy-paste the entire block below:
 
-| Variable | Required | Description | Example |
+```bash
+# ==============================================================================
+# 1. DATABASE (PostgreSQL with pgvector)
+# ==============================================================================
+# Create a free database at https://neon.tech and paste your connection string:
+DATABASE_URL="postgresql://username:password@ep-your-instance.region.aws.neon.tech/neondb?sslmode=require"
+
+# ==============================================================================
+# 2. NEXTAUTH AUTHENTICATION
+# ==============================================================================
+# Generate a random 32-character string using: openssl rand -hex 32
+NEXTAUTH_SECRET="7f3c1d9a2b8e4f5061728394a5b6c7d8e9f0123456789abcdef0123456789abc"
+
+# The canonical URL of your site (use http://localhost:3000 for local development)
+NEXTAUTH_URL="http://localhost:3000"
+
+# Public URL used for metadata and SEO
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+
+# ==============================================================================
+# 3. AI INFERENCE ENGINE (Groq - Free at https://console.groq.com)
+# ==============================================================================
+# Primary Groq API Key (You can add multiple keys for automatic round-robin rotation)
+GROQ_API_KEY_1="gsk_your_groq_api_key_here"
+# GROQ_API_KEY_2="gsk_optional_second_key_here"
+# GROQ_API_KEY_3="gsk_optional_third_key_here"
+
+# Default ultra-fast model (produces roadmaps in ~3.2 seconds without reasoning token overhead)
+GROQ_MODEL="qwen/qwen3.8-27b"
+
+# ==============================================================================
+# 4. VISION AI / OCR FALLBACK (NVIDIA NIM - Free 1,000 credits at https://build.nvidia.com)
+# ==============================================================================
+NVIDIA_API_KEY="nvapi-your_nvidia_api_key_here"
+NVIDIA_MODEL="meta/llama-3.2-11b-vision-instruct"
+
+# ==============================================================================
+# 5. VECTOR EMBEDDINGS (Jina AI - Free 10M tokens at https://jina.ai/embeddings)
+# ==============================================================================
+# Powers the streaming AI Mentor (Graa) grounded in your curriculum via RAG
+EMBEDDINGS_API_URL="https://api.jina.ai/v1/embeddings"
+EMBEDDINGS_API_KEY_1="jina_your_jina_key_here"
+# EMBEDDINGS_API_KEY_2="jina_optional_second_key_here"
+# EMBEDDINGS_API_KEY_3="jina_optional_third_key_here"
+EMBEDDINGS_MODEL="jina-embeddings-v3"
+EMBEDDING_DIM="384"
+
+# ==============================================================================
+# 6. CODE PLAYGROUND & EXECUTION (Optional)
+# ==============================================================================
+# Leave empty to use free Paiza.io execution (no key needed).
+# Or provide your self-hosted Piston endpoint (e.g., https://piston.example.com/api/v2/piston)
+PISTON_URL=""
+
+# ==============================================================================
+# 7. GOOGLE OAUTH LOGIN (Optional)
+# ==============================================================================
+# Leave empty to use email/password authentication only.
+# To enable "Sign in with Google", create credentials in Google Cloud Console:
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+```
+
+### Detailed Environment Variables Breakdown
+
+| Variable | Required | Description | Where to Get |
 | :--- | :---: | :--- | :--- |
-| `DATABASE_URL` | **Yes** | PostgreSQL connection string (Neon or RDS) | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` |
-| `NEXTAUTH_SECRET` | **Yes** | Random 32+ character string for JWT signing | `7f3c1d9a2b8e4f5061728394a5b6c7d8...` |
-| `NEXTAUTH_URL` | **Yes** | Full canonical URL of your deployed site | `https://your-domain.com` (or `http://localhost:3000`) |
-| `NEXT_PUBLIC_SITE_URL` | **Yes** | Public site URL for metadata | `https://your-domain.com` |
-| `GROQ_API_KEY_1` | **Yes** | Primary Groq API key | `gsk_...` |
-| `GROQ_MODEL` | **Yes** | High-speed AI model | `qwen/qwen3.8-27b` |
-| `EMBEDDINGS_API_URL` | **Yes** | Vector embedding endpoint | `https://api.jina.ai/v1/embeddings` |
-| `EMBEDDINGS_API_KEY_1`| **Yes** | Jina AI API key for RAG | `jina_...` |
-| `EMBEDDINGS_MODEL` | **Yes** | Model identifier for embeddings | `jina-embeddings-v3` |
-| `EMBEDDING_DIM` | **Yes** | Vector dimension size | `384` |
-| `NVIDIA_API_KEY` | *Optional*| NVIDIA NIM key for vision OCR fallback | `nvapi-...` |
-| `NVIDIA_MODEL` | *Optional*| Vision AI model name | `meta/llama-3.2-11b-vision-instruct` |
-| `GOOGLE_CLIENT_ID` | *Optional*| Google OAuth Client ID | `your-id.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET`| *Optional*| Google OAuth Client Secret | `GOCSPX-...` |
-| `PISTON_URL` | *Optional*| Self-hosted Piston sandbox (defaults to Paiza) | `""` |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string | [Neon.tech](https://neon.tech) (Free tier) or AWS RDS |
+| `NEXTAUTH_SECRET` | **Yes** | 32+ character JWT secret | Run `openssl rand -hex 32` |
+| `NEXTAUTH_URL` | **Yes** | Canonical URL of the platform | `http://localhost:3000` (local) or `https://your-domain.com` (prod) |
+| `NEXT_PUBLIC_SITE_URL` | **Yes** | Public site URL for SEO & metadata | `http://localhost:3000` (local) or `https://your-domain.com` (prod) |
+| `GROQ_API_KEY_1` | **Yes** | Groq API key for roadmaps & quizzes | [console.groq.com](https://console.groq.com) (Free) |
+| `GROQ_MODEL` | **Yes** | Fast AI model identifier | `qwen/qwen3.8-27b` |
+| `EMBEDDINGS_API_URL` | **Yes** | Vector embeddings API endpoint | `https://api.jina.ai/v1/embeddings` |
+| `EMBEDDINGS_API_KEY_1`| **Yes** | Jina API key for RAG chat | [jina.ai/embeddings](https://jina.ai/embeddings) (Free) |
+| `EMBEDDINGS_MODEL` | **Yes** | Embedding model name | `jina-embeddings-v3` |
+| `EMBEDDING_DIM` | **Yes** | Dimension size for `pgvector` | `384` |
+| `NVIDIA_API_KEY` | *Optional*| Vision AI key for scanned document OCR | [build.nvidia.com](https://build.nvidia.com) (Free) |
+| `NVIDIA_MODEL` | *Optional*| Vision model name | `meta/llama-3.2-11b-vision-instruct` |
+| `PISTON_URL` | *Optional*| Custom Piston compiler endpoint | Leave empty for free Paiza.io |
+| `GOOGLE_CLIENT_ID` | *Optional*| Google Cloud OAuth Client ID | [console.cloud.google.com](https://console.cloud.google.com) |
+| `GOOGLE_CLIENT_SECRET`| *Optional*| Google Cloud OAuth Client Secret | [console.cloud.google.com](https://console.cloud.google.com) |
 
 ---
 
