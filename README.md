@@ -1,211 +1,258 @@
-# Graa AI 🔥
+# 🎓 Graa AI — Autonomous Day-by-Day Learning Platform
 
-Turn any goal into a **day-by-day learning roadmap** — with curated lessons, quizzes that gate your progress, a real in-browser code playground, and an AI mentor that actually knows what you're learning. Learning that's focused, practical, and finishable.
+[![GitHub Repository](https://img.shields.io/badge/GitHub-YogenderVermaa%2Fgraa--ai-orange?style=flat&logo=github)](https://github.com/YogenderVermaa/graa-ai)
+[![Next.js](https://img.shields.io/badge/Next.js-16%20(App%20Router)-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/ORM-Prisma%205-2D3748?style=flat&logo=prisma)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20pgvector-336791?style=flat&logo=postgresql)](https://neon.tech/)
+[![Groq](https://img.shields.io/badge/AI%20Inference-Groq%20(Sub--4s)-f55036?style=flat)](https://groq.com/)
+[![AWS Ready](https://img.shields.io/badge/Deployment-AWS%20App%20Runner%20%2F%20Docker-FF9900?style=flat&logo=amazon-aws)](https://aws.amazon.com/)
 
-Built to run on a **100% free stack**.
+**Graa AI** transforms any academic syllabus, university textbook, or learning goal into an actionable, **day-by-day mastery roadmap**. It pairs structured daily progression with curated video tutorials, progressive lessons, active-recall quiz gates, a live multi-language code playground, an AI mentor grounded in your curriculum via RAG, and an overall cross-goal performance analytics dashboard.
+
+**Zero External Microservices Needed:** Runs as a **100% self-contained application** that can be hosted for **$0** on free tiers or deployed to enterprise cloud providers like **AWS (App Runner, ECS, EC2)**, **Vercel**, or any Docker host.
 
 ---
 
-## The learning loop
+## ⚡ Key Highlights & Core Features
 
+### 1. 📤 Smart Syllabus & Large Textbook Processing (Up to 50MB+)
+- Upload PDFs, Word documents (`.docx`), Markdown, or plain text.
+- **Client-Side PDF.js Engine**: Decodes massive 500+ page university textbooks directly inside the user's browser, extracting Table of Contents and bookmark outlines in **~1.5 seconds**.
+- Bypasses cloud serverless upload limits by sending a clean ~20KB text outline rather than multi-megabyte binary files.
+- **"Behind The Scenes" Visualizer**: Live terminal telemetry, multi-stage synthesis pipeline, elapsed timer, and science-backed study tips keep users visually engaged while the AI generates the roadmap in **~3.5 seconds**.
+
+### 2. 🗺️ Strict Day-by-Day Learning Gating Loop
 ```
-Set a goal (+ optional days/skill)
-        │  AI sizes the timeline if you don't
-        ▼
-Day-by-day roadmap (N daily tasks)
-        ▼
-Learning page per day  ── curated YouTube video + docs + an AI-written lesson
-        ▼
-MCQ quiz (≥70% to pass)  ── pass to unlock the day's practice
-        ▼
-Code playground  ── write code, Run it (11 languages), reveal Hints, Submit for AI review
-        ▼
-Day auto-completes → the next day unlocks
-        ▲
-   AI mentor (Graa) on every page — answers grounded in YOUR curriculum (RAG)
+Syllabus Upload or Goal Prompt
+              │
+              ▼
+Day-by-Day Progressive Roadmap (7 to 90 Days)
+              │
+              ▼
+Day Learning Page  ── Curated YouTube video + documentation + AI lesson
+              │
+              ▼
+MCQ Quiz (≥70% pass requirement)  ── Pass to unlock the day's practical challenge
+              │
+              ▼
+In-Browser Code Playground  ── Monaco editor (11 languages), live Run, progressive Hints & AI grading
+              │
+              ▼
+Day Auto-Completes ➔ Next Day Unlocks!
+              ▲
+              │
+🤖 AI Mentor (Graa)  ── Contextual chat grounded in your curriculum via RAG (pgvector)
 ```
 
-A day unlocks **only** when the previous day is complete.
+### 3. 📊 Overall Cross-Goal Performance Dashboard (`/dashboard/performance`)
+- **Mastery Radar Chart**: Multi-dimensional scoring across Consistency, Velocity, Accuracy, Depth, Problem Solving, and Retention.
+- **GitHub-Style Activity Heatmap**: Daily learning streak tracking across weeks and months.
+- **Subject-Wise Mastery Breakdown**: Track accuracy and completion across Programming, Mathematics, Data Science, and more.
+- **Goal Portfolio Table**: Comprehensive view of all roadmaps, tasks completed, quiz accuracy, and target dates.
+
+### 4. 💻 In-Browser Code Sandbox & Evaluation
+- **Monaco Editor**: Syntax highlighting and code editing for 11 languages (Python, JavaScript, TypeScript, C++, C, Java, Go, Rust, Ruby, PHP, C#).
+- **Execution & Grading**: Test code with live compiler outputs, unlock progressive hints, and submit for automated AI feedback and grading.
 
 ---
 
-## AI models
+## 🏗️ Technology Architecture
 
-| Purpose | Provider | Model |
-|---|---|---|
-| All text generation — roadmaps, lessons, quizzes, practice tasks, hints, submission grading, chat, feedback | **Groq** | **Llama 3.3 70B Versatile** (`llama-3.3-70b-versatile`) |
-| Embeddings for RAG (grounds the mentor in your curriculum) | **Jina AI** | **jina-embeddings-v3** (384-dim) |
-
-Both are swappable via env. Groq is OpenAI-compatible; the embeddings endpoint is any OpenAI-compatible `/embeddings` API.
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) + TypeScript |
-| Styling | Tailwind CSS v4 (custom "ember" design system) |
-| Database | Neon **PostgreSQL** + **pgvector** (RAG vector store) |
-| ORM | Prisma 5 |
-| LLM | Groq · Llama 3.3 70B |
-| Embeddings | Jina · jina-embeddings-v3 |
-| Auth | NextAuth v4 (JWT) — credentials + **Google OAuth** |
-| Code editor | Monaco (`@monaco-editor/react`) |
-| Code execution | Paiza.io (free, no key) — or self-hosted Piston via `PISTON_URL` |
-| Content sourcing | DuckDuckGo HTML + YouTube + Cheerio (scraped, cached per day) |
-
-Every external service has a free tier; total run cost can be **$0**.
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | Next.js 16 (App Router) + React 19 | Server & Client web application |
+| **Language** | TypeScript 5 | End-to-end type safety |
+| **Styling** | Tailwind CSS v4 | Responsive glassmorphic "ember" dark theme |
+| **Database** | PostgreSQL + `pgvector` | User state, roadmaps, task completion, RAG vectors |
+| **ORM** | Prisma 5 | Schema migrations and type-safe DB queries |
+| **Primary LLM** | Groq (`qwen/qwen3.8-27b`) | Sub-4s roadmap generation, quizzes, and code grading |
+| **Fallback LLM** | NVIDIA NIM (`meta/llama-3.2-11b-vision-instruct`) | Vision AI OCR and secondary text inference |
+| **Embeddings** | Jina AI (`jina-embeddings-v3`, 384-dim) | Semantic RAG embeddings for AI mentor chat |
+| **Authentication** | NextAuth.js v4 | Credentials (JWT) and optional Google OAuth |
+| **Containerization** | Docker (Alpine Multi-Stage) | Standalone ~120MB image ready for AWS / Docker |
 
 ---
 
-## Features
+## 🔑 Required API Keys & Services (100% Free Tiers)
 
-- 🗺️ **Day-by-day roadmaps** — describe a goal; AI generates a realistic per-day curriculum (and infers the duration if you don't give one). Long roadmaps are auto-filled in batches so they're never truncated.
-- 📚 **Curated daily content** — each day pulls the best-matching YouTube tutorial, doc links, and an AI-written lesson grounded in the scraped sources. Cached per day, so the web is hit once.
-- 🎓 **Quizzes that gate** — a 5-question MCQ after each lesson; pass (≥70%) to unlock the day's practice. Answers are graded server-side.
-- 🧑‍💻 **Real code playground** — Monaco editor, 11 languages (JS, TS, Python, Java, C++, C, Go, Rust, Ruby, PHP, C#), **Run** with live output, progressive **Hints**, and **Submit** for AI grading. Passing marks the day complete.
-- 🔒 **Progress gating** — finish a day to unlock the next; locked days show clearly in the roadmap.
-- 🤖 **AI mentor (Graa)** — a draggable, always-available chat that streams answers **grounded in your curriculum via RAG** (pgvector + Jina embeddings).
-- 📊 **Product dashboard** — "Continue learning" resume hero, progress stats, and a goals overview.
-- 🔐 **Auth** — email/password or **Sign in with Google**; per-user learning-style profile.
+To host this platform, you only need free API keys from these services (setup takes ~5 minutes):
+
+1. **PostgreSQL Database** *(Free)*:
+   - Create a free database at [Neon.tech](https://neon.tech) (comes with built-in `pgvector`).
+   - Copy the connection string: `postgresql://user:password@host/db?sslmode=require`.
+2. **Groq AI Key** *(Free)*:
+   - Sign up at [console.groq.com](https://console.groq.com) and create an API key (`gsk_...`).
+   - Groq provides ultra-fast inference with generous free rate limits.
+3. **Jina AI Embeddings Key** *(Free)*:
+   - Get a free key at [jina.ai/embeddings](https://jina.ai/embeddings) (includes 10 million free tokens for RAG).
+4. **NextAuth Secret**:
+   - Generate any random 32-character string (e.g. run `openssl rand -hex 32` in your terminal).
+5. **NVIDIA API Key** *(Optional Fallback)*:
+   - Free 1,000 credits at [build.nvidia.com](https://build.nvidia.com) for vision OCR fallback.
 
 ---
 
-## Quick start
+## 🚀 How to Host & Deploy
 
-### 1. Install
+### Option 1: Deploy on AWS (Recommended: AWS App Runner)
+
+AWS App Runner provides fully managed container execution, automated zero-downtime deployments from GitHub, automatic HTTPS/SSL certificates, and auto-scaling.
+
+1. **Fork or Clone the Repository**:
+   ```bash
+   git clone https://github.com/YogenderVermaa/graa-ai.git
+   ```
+2. **Open AWS App Runner**:
+   - Navigate to [AWS App Runner Console](https://console.aws.amazon.com/apprunner).
+   - Click **Create an App Runner service**.
+3. **Connect GitHub**:
+   - Choose **Source code repository** ➔ Link your GitHub account.
+   - Select repository: `YogenderVermaa/graa-ai`, Branch: `main`.
+   - Select **Automatic deployment**.
+4. **Configure Build Settings**:
+   - **Runtime**: `Nodejs 20` *(or select Container image if using ECR)*.
+   - **Build command**: `npx prisma generate && npm run build`
+   - **Start command**: `npm start`
+   - **Port**: `3000`
+5. **Add Environment Variables** (see table below).
+6. **Click Deploy**:
+   - In 3–5 minutes, AWS will provide you with a live HTTPS URL (e.g. `https://xyz.awsapprunner.com`).
+
+*(See [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md) for detailed ECS, Fargate, and EC2 instructions).*
+
+---
+
+### Option 2: Deploy with Docker / Docker Compose (Any VPS / EC2 / Lightsail)
+
+The repository includes a production-ready, multi-stage [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml):
+
 ```bash
+# 1. Clone repository
+git clone https://github.com/YogenderVermaa/graa-ai.git
+cd graa-ai/graa-ai
+
+# 2. Configure environment
+cp .env.example .env
+nano .env # Paste your database and API keys
+
+# 3. Apply Prisma database schema
+npx prisma db push
+
+# 4. Build and start container in detached mode
+docker-compose up -d --build
+```
+Your application will be live at `http://localhost:3000` (or your server's public IP).
+
+---
+
+### Option 3: Deploy on Vercel
+
+1. Import the repository `YogenderVermaa/graa-ai` in [Vercel](https://vercel.com).
+2. Framework Preset: **Next.js**.
+3. Under **Settings → Environment Variables**, add the environment variables listed below.
+4. Set `NEXTAUTH_URL` to your production Vercel URL (e.g. `https://your-app.vercel.app`).
+5. Click **Deploy**.
+
+---
+
+## ⚙️ Environment Variables Reference
+
+Copy `.env.example` to `.env` and fill in the values:
+
+| Variable | Required | Description | Example |
+| :--- | :---: | :--- | :--- |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string (Neon or RDS) | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` |
+| `NEXTAUTH_SECRET` | **Yes** | Random 32+ character string for JWT signing | `7f3c1d9a2b8e4f5061728394a5b6c7d8...` |
+| `NEXTAUTH_URL` | **Yes** | Full canonical URL of your deployed site | `https://your-domain.com` (or `http://localhost:3000`) |
+| `NEXT_PUBLIC_SITE_URL` | **Yes** | Public site URL for metadata | `https://your-domain.com` |
+| `GROQ_API_KEY_1` | **Yes** | Primary Groq API key | `gsk_...` |
+| `GROQ_MODEL` | **Yes** | High-speed AI model | `qwen/qwen3.8-27b` |
+| `EMBEDDINGS_API_URL` | **Yes** | Vector embedding endpoint | `https://api.jina.ai/v1/embeddings` |
+| `EMBEDDINGS_API_KEY_1`| **Yes** | Jina AI API key for RAG | `jina_...` |
+| `EMBEDDINGS_MODEL` | **Yes** | Model identifier for embeddings | `jina-embeddings-v3` |
+| `EMBEDDING_DIM` | **Yes** | Vector dimension size | `384` |
+| `NVIDIA_API_KEY` | *Optional*| NVIDIA NIM key for vision OCR fallback | `nvapi-...` |
+| `NVIDIA_MODEL` | *Optional*| Vision AI model name | `meta/llama-3.2-11b-vision-instruct` |
+| `GOOGLE_CLIENT_ID` | *Optional*| Google OAuth Client ID | `your-id.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET`| *Optional*| Google OAuth Client Secret | `GOCSPX-...` |
+| `PISTON_URL` | *Optional*| Self-hosted Piston sandbox (defaults to Paiza) | `""` |
+
+---
+
+## 💻 Local Development Setup
+
+To run Graa AI locally on your development machine:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/YogenderVermaa/graa-ai.git
+cd graa-ai/graa-ai
+
+# 2. Install dependencies
 npm install
+
+# 3. Create .env file
+cp .env.example .env
+# Edit .env with your PostgreSQL and Groq credentials
+
+# 4. Push database schema & generate Prisma Client
+npx prisma db push
+
+# 5. Start development server
+npm run dev
 ```
-
-### 2. Environment (`.env`)
-```env
-# Public production URL used for SEO metadata, sitemap, and canonical URLs
-NEXT_PUBLIC_SITE_URL="https://graaai.vercel.app"
-
-# Database (Neon or any Postgres; pgvector enabled automatically)
-DATABASE_URL="postgresql://user:password@host/db?sslmode=require"
-
-# LLM — Groq (free at console.groq.com)
-GROQ_API_KEY="gsk_..."
-GROQ_MODEL="llama-3.3-70b-versatile"
-
-# Embeddings for RAG — Jina (free at jina.ai/embeddings). Leave key empty to disable RAG.
-EMBEDDINGS_API_URL="https://api.jina.ai/v1/embeddings"
-EMBEDDINGS_API_KEY="jina_..."
-EMBEDDINGS_MODEL="jina-embeddings-v3"
-EMBEDDING_DIM="384"
-
-# Auth
-NEXTAUTH_SECRET="any-random-32-char-string"   # openssl rand -base64 32
-NEXTAUTH_URL="http://localhost:3000"           # set to your prod URL in production
-
-# Google OAuth (optional — enables "Sign in with Google")
-GOOGLE_CLIENT_ID=""
-GOOGLE_CLIENT_SECRET=""
-
-# Optional: self-hosted Piston for scalable code execution (defaults to Paiza.io)
-# PISTON_URL="https://piston.example.com/api/v2/piston"
-```
-
-### 3. Database
-```bash
-npx prisma db push      # also enables the pgvector extension via the schema
-```
-
-### 4. Run
-```bash
-npm run dev             # development (http://localhost:3000)
-# or
-npm run build && npm run start   # production build (much faster — use this to judge real speed)
-```
-
-> Note: `npm run build` runs `prisma generate` first (also configured as a `postinstall`), so deployments always get a fresh Prisma Client.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Deploying to Vercel
-
-1. Import the repo; framework preset **Next.js**.
-2. Add **all** env vars above in **Project → Settings → Environment Variables**.
-3. Set `NEXTAUTH_URL` to your real domain, e.g. `https://graaai.vercel.app` (no trailing slash).
-4. **Google OAuth** — in Google Cloud Console, add:
-   - Authorized JavaScript origin: `https://<your-domain>`
-   - Authorized redirect URI: `https://<your-domain>/api/auth/callback/google`
-   - If the consent screen is in "Testing", add your account as a test user (or publish).
-5. Redeploy after any env change.
-
-The build already runs `prisma generate`, which avoids the common "Prisma Client not generated" error on Vercel's cached installs.
-
----
-
-## Project structure
+## 📁 Repository Structure
 
 ```
-app/
-  page.tsx                       # Landing page
-  login/ register/               # Auth (compact split-screen)
-  dashboard/                     # Home: resume hero, stats, goals
-  goals/                         # Goals list
-  goals/[id]/                    # Roadmap (phases + daily lessons grid)
-  goals/[id]/day/[day]/          # Learning page (video/docs/lesson → quiz → practice)
-  profile/                       # Profile + learning style
-  api/
-    auth/[...nextauth]/          # NextAuth (credentials + Google)
-    register/  profile/          # Account
-    goals/  goals/[id]/          # Goal CRUD + listing
-    goals/[id]/day/[day]/        # Day content (scrape + lesson, cached; ?refresh=1)
-    goals/[id]/day/[day]/quiz/   # Quiz generate + grade
-    goals/[id]/day/[day]/practice/  # Practice task + AI submission grading
-    roadmap/                     # Roadmap draft generation
-    chat/                        # Streaming RAG mentor
-    run/                         # Multi-language code execution (Paiza/Piston)
-
-components/
-  Logo, AppNav, Aurora           # Brand + shell
-  EmptyRoadmapBuilder            # Goal composer
-  RoadmapGraph                   # Roadmap + daily lessons (with gating)
-  DayLearning                    # Per-day learning page
-  QuizPanel, PracticeSandbox, CodePlayground
-  ChatLauncher, ChatPanel        # Draggable AI mentor
-  Toast                          # Toasts + confirm dialog
-  GoalCard, NewGoalModal, GoogleButton, AuthShell
-
-lib/
-  groq.ts                        # All LLM functions (Groq)
-  embeddings.ts                  # Hosted embeddings client
-  rag.ts                         # pgvector index + retrieve
-  scrape.ts                      # DuckDuckGo + YouTube + readability
-  prisma.ts  auth.ts             # DB client + NextAuth config
-
-prisma/schema.prisma             # Data model
+graa-ai/
+├── app/
+│   ├── page.tsx                     # Landing page with interactive hero & animations
+│   ├── login/ & register/           # NextAuth credentials & Google login
+│   ├── dashboard/                   # Main dashboard (Goal cards, stats, curriculum upload)
+│   │   └── performance/             # Cross-goal performance & mastery analytics dashboard
+│   ├── goals/[id]/                  # Interactive roadmap view (phases, milestones, days)
+│   │   └── day/[day]/               # Day learning interface (Video, AI lesson, Quiz, Code Sandbox)
+│   ├── profile/                     # User preferences & learning style settings
+│   └── api/
+│       ├── auth/[...nextauth]/      # Authentication API
+│       ├── curriculum/parse/        # Curriculum processing & atomic roadmap generation
+│       ├── performance/             # Cross-goal analytics aggregation API
+│       ├── goals/ & goals/[id]/     # Goal CRUD & day content endpoints
+│       ├── chat/                    # RAG AI mentor streaming endpoint
+│       └── run/                     # Multi-language code execution runner
+├── components/
+│   ├── CurriculumUploadModal.tsx    # Upload modal with live "Behind the Scenes" visualizer
+│   ├── OverallPerformanceDashboard.tsx # Radar charts, velocity, and activity heatmaps
+│   ├── DayLearning.tsx              # Day lesson, video player, language switcher
+│   ├── CodePlayground.tsx           # Monaco editor with multi-language execution
+│   ├── QuizPanel.tsx                # Gated MCQ assessment component
+│   └── RoadmapGraph.tsx             # Interactive milestone & task progression tree
+├── lib/
+│   ├── clientCurriculumParser.ts    # In-browser PDF.js & Table of Contents extraction
+│   ├── curriculumParser.ts          # Server-side native PDF & Word document parsing
+│   ├── groq.ts                      # Multi-provider LLM inference engine (Groq, NVIDIA)
+│   ├── rag.ts                       # pgvector vector store & context retrieval
+│   └── prisma.ts                    # PostgreSQL Prisma client & connection pooling
+├── prisma/
+│   └── schema.prisma                # PostgreSQL database schema with composite indexes
+├── public/
+│   └── pdf.worker.min.mjs           # Local offline WebAssembly PDF worker
+├── Dockerfile                       # Production multi-stage Alpine Dockerfile
+├── docker-compose.yml               # Local & VPS container configuration
+├── AWS_DEPLOYMENT.md                # Dedicated step-by-step AWS deployment guide
+└── next.config.ts                   # Next.js config with standalone output enabled
 ```
 
 ---
 
-## Open source
+## 📜 License & Acknowledgments
 
-Graa AI is open source under the [MIT License](LICENSE). You are welcome to use, modify, and distribute it, including for commercial projects, subject to the license terms.
+This project is licensed under the **MIT License** — you are free to use, modify, and distribute it for personal or commercial projects.
 
-### Contributing
-
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request, and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-If you discover a security vulnerability, please follow the private reporting guidance in [SECURITY.md](SECURITY.md) rather than opening a public issue.
-
----
-
-## Data model
-
-- **User** — email, name, password?, image?, learningStyle, (Google OAuth supported)
-- **Goal** — title, description, category, durationDays, skillLevel, planJson, status
-- **Task** — one per day (day, week, phase, title, description, type, completed)
-- **DayContent** — cached per (goal, day): video, docs, lesson text, practice task
-- **Quiz** / **QuizAttempt** — per-day MCQs + graded attempts
-- **ContentChunk** — pgvector store (`vector(384)`) for RAG
-- **Milestone** / **Resource** — roadmap phases + curated resources
-
----
-
-Made with Groq, Jina, Neon, and a lot of free tiers. 🔥
+- **Author**: [Yogender Verma](https://github.com/YogenderVermaa)
+- **Repository**: [https://github.com/YogenderVermaa/graa-ai](https://github.com/YogenderVermaa/graa-ai)
