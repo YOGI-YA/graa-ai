@@ -181,6 +181,12 @@ async function transcribeImageBufferWithVision(buffer: Buffer, mimeType: string)
   return ''
 }
 
+function isValidDocumentText(text: string): boolean {
+  if (!text || text.trim().length < 20) return false
+  const printableWords = text.match(/[A-Za-z0-9]{2,}/g) || []
+  return printableWords.length >= 6
+}
+
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   // Method 1: PDFParse library class (Mozilla pdf.js engine - full font, layout, unicode support)
   try {
@@ -195,14 +201,14 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
           await parser.destroy().catch(() => {})
         }
         const text = (typeof result === 'string' ? result : result?.text || '').trim()
-        if (text.length >= 20) {
+        if (isValidDocumentText(text)) {
           logger.info('CURRICULUM_PARSE', 'Extracted text via PDFParse engine', { charCount: text.length })
           return text
         }
       } else if (typeof PDFParse === 'function') {
         const data = await PDFParse(buffer).catch(() => null)
         const text = (typeof data?.text === 'string' ? data.text : '').trim()
-        if (text.length >= 20) {
+        if (isValidDocumentText(text)) {
           logger.info('CURRICULUM_PARSE', 'Extracted text via pdf-parse function', { charCount: text.length })
           return text
         }
@@ -215,7 +221,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   // Method 2: High-performance pure Node.js FlateDecode stream extractor
   try {
     const streamText = extractTextFromPdfPureNode(buffer)
-    if (streamText && streamText.length >= 20) {
+    if (isValidDocumentText(streamText)) {
       logger.info('CURRICULUM_PARSE', 'Extracted text via Pure Node PDF Stream Extractor', {
         charCount: streamText.length,
         preview: streamText.slice(0, 100),
@@ -229,7 +235,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   // Method 3: If text is sparse or document is an image scan, pass to Vision AI OCR
   try {
     const visionText = await transcribeImageBufferWithVision(buffer, 'image/png')
-    if (visionText && visionText.length >= 20) {
+    if (isValidDocumentText(visionText)) {
       logger.info('CURRICULUM_PARSE', 'Extracted text via Vision AI OCR', { charCount: visionText.length })
       return visionText.trim()
     }

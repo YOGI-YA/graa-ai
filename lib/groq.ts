@@ -789,7 +789,7 @@ export async function generateRoadmapFromCurriculum(
   const prompt = `You are an elite academic curriculum architect and learning coach.
 You have been provided with an uploaded curriculum / syllabus document.
 
-Deeply analyze this curriculum, extracting all core units, chapters, learning outcomes, and topic sequences, and transform it into an actionable day-by-day learning roadmap.
+Deeply analyze this curriculum, extracting all core academic units, chapters, learning outcomes, and technical topics, and transform it into an actionable day-by-day learning roadmap.
 
 UPLOADED CURRICULUM TEXT:
 """
@@ -801,14 +801,16 @@ ${skillLevel ? `Target skill level: ${skillLevel}` : ''}
 ${langInstruction ? `${langInstruction}` : ''}
 ${durationLine}
 
-INSTRUCTIONS:
-1. "title": Extract the authentic course/subject title directly from the curriculum (e.g. "Data Structures and Algorithms", "Organic Chemistry I", "Operating Systems", etc.). Do NOT use generic names.
-2. "description": 2-3 sentence summary of the curriculum scope, pre-requisites, and target learning outcomes.
-3. "category": Choose the best matching category (Programming, Data Science, Design, Language, Business, Mathematics, Science, Arts, Health, Other).
-4. "milestones": Map the syllabus's main Units / Modules / Chapters into 4-8 ordered milestones with detailed descriptions.
-5. "resources": Extract any referenced textbooks, reference books, websites, or tools mentioned in the syllabus.
-6. "days": Sequence every subtopic logically day by day. Every single day must have a UNIQUE, SPECIFIC focused title matching the curriculum — NO duplicate or vague topics. Progress from foundational to advanced.
-7. "advice": Personalized coaching strategy on how to study and master this specific syllabus.
+CRITICAL DIRECTIVES:
+1. SUBJECT MATTER ONLY: The roadmap MUST teach the actual academic subject described in the syllabus (e.g., Computer Science, Data Structures, Web Development, Mathematics, Physics, Business, Medicine, Law, etc.).
+2. FORBIDDEN: NEVER generate a meta-roadmap about "processing documents", "analyzing corrupted syllabi", "recovering outlines", or "parsing text". Every lesson must teach a real concept or exercise in the subject!
+3. "title": Extract the authentic subject/course title directly from the document (e.g., "Data Structures and Algorithms", "Organic Chemistry I", "Fullstack Web Development").
+4. "description": 2-3 sentence summary of the subject scope and target learning outcomes.
+5. "category": Choose the best matching category (Programming, Data Science, Design, Language, Business, Mathematics, Science, Arts, Health, Other).
+6. "milestones": Map the syllabus's main Units / Modules / Chapters into 4-8 ordered milestones with detailed descriptions.
+7. "resources": Extract any referenced textbooks, reference books, websites, or tools mentioned in the syllabus.
+8. "days": Sequence every subtopic logically day by day. Every single day must have a UNIQUE, SPECIFIC focused title matching the curriculum concepts (e.g., "Singly Linked Lists & Pointers", "Binary Tree Traversals (BFS & DFS)", "Dijkstra's Shortest Path Algorithm"). NO vague titles. Progress from foundational to advanced.
+9. "advice": Personalized coaching strategy on how to study and master this specific subject.
 
 Respond ONLY with a valid JSON object in the exact format:
 {
