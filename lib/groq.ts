@@ -369,7 +369,7 @@ export async function createChatCompletion(
               payload,
               {
                 headers,
-                timeout: 30000,
+                timeout: 45000,
               }
             )
 
@@ -803,7 +803,7 @@ Deeply analyze this curriculum, extracting all core academic units, chapters, le
 
 UPLOADED CURRICULUM TEXT:
 """
-${curriculumText.slice(0, 28000)}
+${curriculumText.slice(0, 12000)}
 """
 
 ${learningStyle ? `Learner style: ${learningStyle}` : ''}

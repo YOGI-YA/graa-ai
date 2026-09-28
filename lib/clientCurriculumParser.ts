@@ -127,8 +127,8 @@ export async function extractTextFromPdfInBrowser(
           ...outlineLines,
         ].join('\n')
 
-        // If outline is rich and comprehensive, we can supplement with first 10 pages for preface/course info
-        const introPagesToRead = Math.min(numPages, 10)
+        // If outline is rich and comprehensive, supplement with first 5 pages for title & course info
+        const introPagesToRead = Math.min(numPages, 5)
         const introTextPieces: string[] = []
         for (let i = 1; i <= introPagesToRead; i++) {
           const page = await pdf.getPage(i)
@@ -143,7 +143,7 @@ export async function extractTextFromPdfInBrowser(
 
         const combined = `${outlineText}\n\n# Course Overview & Syllabus Details\n${introTextPieces.join('\n\n')}`
         onProgress?.('Extracted complete syllabus outline!', 100)
-        return combined.slice(0, 30000)
+        return combined.slice(0, 12000)
       }
     }
   } catch (err) {
@@ -151,15 +151,13 @@ export async function extractTextFromPdfInBrowser(
   }
 
   // 2. Page-by-page extraction with smart prioritization for large textbooks
-  // If <= 30 pages: Read every page
-  // If > 30 pages (e.g. 500-page book): Prioritize first 25 pages (TOC, Preface, Course Scope)
-  // plus scan for pages with keywords like "Contents", "Syllabus", "Schedule", "Unit"
+  // If <= 20 pages: Read every page
+  // If > 20 pages (e.g. 500-page book): Prioritize first 16 pages (where Table of Contents and Syllabus reside)
   const pagesToScan: number[] = []
-  if (numPages <= 30) {
+  if (numPages <= 20) {
     for (let i = 1; i <= numPages; i++) pagesToScan.push(i)
   } else {
-    // For large textbooks, the syllabus and table of contents are in the first 25 pages
-    for (let i = 1; i <= Math.min(numPages, 28); i++) {
+    for (let i = 1; i <= Math.min(numPages, 16); i++) {
       pagesToScan.push(i)
     }
   }
@@ -197,8 +195,7 @@ export async function extractTextFromPdfInBrowser(
   }
 
   onProgress?.('Curriculum text ready!', 100)
-  // Limit to 25,000 characters to keep prompt optimal and prevent token truncation
-  return fullText.slice(0, 25000)
+  return fullText.slice(0, 12000)
 }
 
 /**
