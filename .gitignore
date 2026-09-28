@@ -48,3 +48,8 @@ __pycache__/
 .venv/
 venv/
 
+# microservices
+pdf-extractor-service/node_modules/
+pdf-extractor-service/dist/
+
+

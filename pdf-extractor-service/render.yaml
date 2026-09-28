@@ -1,10 +1,15 @@
 services:
   - type: web
-    name: graa-pdf-extractor
-    env: python
-    region: oregon
+    name: graa-document-extractor
+    env: node
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    autoDeploy: true
-    healthCheckPath: /health
+    rootDir: pdf-extractor-service
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_ENV
+        value: production

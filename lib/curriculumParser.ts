@@ -249,7 +249,7 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 }
 
 async function extractViaMicroservice(buffer: Buffer, fileName: string): Promise<string | null> {
-  const serviceUrl = process.env.PDF_EXTRACTOR_SERVICE_URL
+  const serviceUrl = process.env.PDF_EXTRACTOR_SERVICE_URL || process.env.PDF_EXTRACTOR_URL
   if (!serviceUrl) return null
 
   try {
@@ -260,13 +260,13 @@ async function extractViaMicroservice(buffer: Buffer, fileName: string): Promise
 
     const res = await axios.post(endpoint, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 35000,
+      timeout: 45000,
     })
 
     if (res.data?.success && typeof res.data.text === 'string' && res.data.text.trim()) {
-      logger.info('CURRICULUM_PARSE', 'Extracted curriculum via Render Microservice', {
-        charCount: res.data.char_count,
-        unitsDetected: res.data.units_detected,
+      logger.info('CURRICULUM_PARSE', 'Extracted curriculum via Extractor Microservice', {
+        charCount: res.data.metadata?.charCount || res.data.char_count,
+        unitsDetected: res.data.metadata?.unitsDetected || res.data.units_detected,
       })
       return res.data.text.trim()
     }
