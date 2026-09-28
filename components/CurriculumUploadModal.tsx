@@ -77,19 +77,30 @@ export default function CurriculumUploadModal({
     e.preventDefault()
     if (!file || isProcessing) return
 
+    if (file.size > 50 * 1024 * 1024) {
+      setError('File size exceeds 50MB limit. Please upload a smaller document or syllabus.')
+      return
+    }
+
     setIsProcessing(true)
     setError('')
     setStatusMessage('Reading & extracting curriculum text...')
 
     try {
-      // 1. First, attempt high-speed client-side extraction in the browser.
-      // This sends a ~15KB text payload instead of a 7MB binary file,
-      // bypassing Vercel's 4.5MB Serverless limit (HTTP 413) completely.
+      // 1. High-speed client-side extraction directly in the browser.
+      // Extracts the Table of Contents and core syllabus text from multi-megabyte PDFs (up to 50MB),
+      // turning a 7MB+ binary file into a clean ~15KB-30KB text outline and bypassing Vercel's 4.5MB payload limit.
       let clientExtractedText = ''
       try {
-        clientExtractedText = await extractTextFromCurriculumClient(file)
-      } catch (err) {
+        clientExtractedText = await extractTextFromCurriculumClient(file, (msg) => {
+          setStatusMessage(msg)
+        })
+      } catch (err: any) {
         console.warn('Client-side extraction fallback:', err)
+        if (err?.message && !err.message.includes('fallback')) {
+          // If explicit error (e.g., empty or corrupted)
+          throw new Error(err.message)
+        }
       }
 
       setStatusMessage('Analyzing syllabus structure & generating day-by-day roadmap...')
@@ -110,7 +121,7 @@ export default function CurriculumUploadModal({
       } else {
         // Fallback for image scans / binary formats: send formData
         if (file.size > 4.5 * 1024 * 1024) {
-          throw new Error('File size exceeds 4.5MB cloud upload limit. Please upload a standard PDF, Word doc, or text syllabus.')
+          throw new Error('This scanned document exceeds the 4.5MB cloud upload limit. Please upload a digital PDF, Word doc, or text syllabus.')
         }
         const formData = new FormData()
         formData.append('file', file)
@@ -125,7 +136,7 @@ export default function CurriculumUploadModal({
       }
 
       if (res.status === 413) {
-        throw new Error('Document payload is too large for cloud upload. Please try a text or standard PDF file.')
+        throw new Error('Document payload is too large for cloud upload. Please try a text or standard digital PDF file.')
       }
 
       let data: any
@@ -265,7 +276,7 @@ export default function CurriculumUploadModal({
                   </div>
                   <p className="text-sm font-medium text-white/80">Click or drag & drop curriculum here</p>
                   <p className="text-xs text-white/40 mt-1">
-                    Supports PDF, Word (.docx), TXT, Markdown, or scanned syllabus images
+                    Supports PDF textbooks & syllabi (up to 50MB), Word (.docx), TXT, or Markdown
                   </p>
                 </div>
               )}

@@ -128,14 +128,11 @@ export function getAllConfiguredProviders(customModel?: string): ProviderEndpoin
   const gKeys = groqKeys()
   if (gKeys.length > 0) {
     const groqModels = [
-      customModel || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'mixtral-8x7b-32768',
-      'gemma2-9b-it',
-      'openai/gpt-oss-20b',
-      'openai/gpt-oss-120b',
+      customModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
       'qwen/qwen3.8-27b',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'allam-2-7b',
     ].filter((m, i, a) => Boolean(m) && a.indexOf(m) === i)
 
     providers.push({
@@ -322,7 +319,13 @@ function getBalancedKeys(providerName: string, keys: string[]): string[] {
 
 export async function createChatCompletion(
   messages: ChatMessage[],
-  options: { maxTokens: number; temperature: number; apiKey?: string; model?: string }
+  options: {
+    maxTokens: number
+    temperature: number
+    apiKey?: string
+    model?: string
+    responseFormat?: { type: 'json_object' }
+  }
 ): Promise<string> {
   const providers = getAllConfiguredProviders(options.model)
 
@@ -350,16 +353,20 @@ export async function createChatCompletion(
 
           try {
             const headers = provider.headers ? provider.headers(key) : { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
+            const payload: any = {
+              model,
+              messages,
+              max_tokens: maxTokens,
+              temperature: options.temperature,
+              top_p: 0.95,
+              stream: false,
+            }
+            if (options.responseFormat && provider.name.toLowerCase() === 'groq') {
+              payload.response_format = options.responseFormat
+            }
             const response = await axios.post<GroqChatResponse>(
               provider.url,
-              {
-                model,
-                messages,
-                max_tokens: maxTokens,
-                temperature: options.temperature,
-                top_p: 0.95,
-                stream: false,
-              },
+              payload,
               {
                 headers,
                 timeout: 30000,
@@ -551,6 +558,9 @@ function extractJson<T = any>(content: string): T {
       if (c === '{' || c === '[') s.push(c)
       else if (c === '}' && s[s.length - 1] === '{') s.pop()
       else if (c === ']' && s[s.length - 1] === '[') s.pop()
+    }
+    if (inStr) {
+      candidate += '"'
     }
     while (s.length > 0) {
       const open = s.pop()
@@ -853,6 +863,7 @@ Respond ONLY with a valid JSON object in the exact format:
     maxTokens: 5000,
     apiKey,
     model,
+    responseFormat: { type: 'json_object' },
   })
 
   const rawParsed = parseRoadmapJson(content)
